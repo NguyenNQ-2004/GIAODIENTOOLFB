@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "surface-container-low": "#f2f3ff",
+          "inverse-surface": "#283044",
+          "surface-container-high": "#e2e7ff",
+          "primary-fixed": "#dbe1ff",
+          "on-surface": "#131b2e",
+          "on-secondary": "#ffffff",
+          "surface-tint": "#0053db",
+          "surface": "#faf8ff",
+          "secondary-fixed-dim": "#b7c8e1",
+          "on-primary-fixed": "#00174b",
+          "surface-bright": "#faf8ff",
+          "surface-container": "#eaedff",
+          "primary-fixed-dim": "#b4c5ff",
+          "on-error": "#ffffff",
+          "on-tertiary-fixed": "#360f00",
+          "inverse-on-surface": "#eef0ff",
+          "surface-container-highest": "#dae2fd",
+          "error-container": "#ffdad6",
+          "tertiary-container": "#bc4800",
+          "surface-dim": "#d2d9f4",
+          "outline": "#737686",
+          "on-surface-variant": "#434655",
+          "on-secondary-fixed": "#0b1c30",
+          "on-tertiary": "#ffffff",
+          "on-tertiary-fixed-variant": "#7d2d00",
+          "tertiary-fixed": "#ffdbcd",
+          "secondary-container": "#d0e1fb",
+          "inverse-primary": "#b4c5ff",
+          "primary-container": "#2563eb",
+          "tertiary": "#943700",
+          "on-background": "#131b2e",
+          "surface-variant": "#dae2fd",
+          "background": "#faf8ff",
+          "on-primary-fixed-variant": "#003ea8",
+          "on-primary": "#ffffff",
+          "secondary-fixed": "#d3e4fe",
+          "outline-variant": "#c3c6d7",
+          "surface-container-lowest": "#ffffff",
+          "primary": "#004ac6",
+          "on-secondary-fixed-variant": "#38485d",
+          "tertiary-fixed-dim": "#ffb596",
+          "on-secondary-container": "#54647a",
+          "secondary": "#505f76",
+          "error": "#ba1a1a",
+          "on-tertiary-container": "#ffede6",
+          "on-error-container": "#93000a",
+          "on-primary-container": "#eeefff"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "space-lg": "0.75rem",
+          "space-sm": "0.375rem",
+          "space-md": "0.5rem",
+          "space-xs": "0.25rem",
+          "margin": "1rem",
+          "gutter": "0.75rem",
+          "space-xl": "1rem"
+        },
+        "fontFamily": {
+          "caption": [
+            "Be Vietnam Pro"
+          ],
+          "headline-lg": [
+            "Be Vietnam Pro"
+          ],
+          "headline-md": [
+            "Be Vietnam Pro"
+          ],
+          "label-md": [
+            "Be Vietnam Pro"
+          ],
+          "body-sm": [
+            "Be Vietnam Pro"
+          ],
+          "body-lg": [
+            "Be Vietnam Pro"
+          ],
+          "headline-xl": [
+            "Be Vietnam Pro"
+          ],
+          "label-sm": [
+            "Be Vietnam Pro"
+          ],
+          "body-md": [
+            "Be Vietnam Pro"
+          ]
+        },
+        "fontSize": {
+          "caption": [
+            "0.6875rem",
+            {
+              "lineHeight": "0.875rem",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-lg": [
+            "1.25rem",
+            {
+              "lineHeight": "1.75rem",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "600"
+            }
+          ],
+          "headline-md": [
+            "1.125rem",
+            {
+              "lineHeight": "1.5rem",
+              "letterSpacing": "-0.015em",
+              "fontWeight": "600"
+            }
+          ],
+          "label-md": [
+            "0.8125rem",
+            {
+              "lineHeight": "1rem",
+              "letterSpacing": "0.01em",
+              "fontWeight": "500"
+            }
+          ],
+          "body-sm": [
+            "0.8125rem",
+            {
+              "lineHeight": "1.125rem",
+              "fontWeight": "400"
+            }
+          ],
+          "body-lg": [
+            "0.9375rem",
+            {
+              "lineHeight": "1.375rem",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-xl": [
+            "1.75rem",
+            {
+              "lineHeight": "2.25rem",
+              "letterSpacing": "-0.025em",
+              "fontWeight": "700"
+            }
+          ],
+          "label-sm": [
+            "0.75rem",
+            {
+              "lineHeight": "0.875rem",
+              "letterSpacing": "0.02em",
+              "fontWeight": "500"
+            }
+          ],
+          "body-md": [
+            "0.875rem",
+            {
+              "lineHeight": "1.25rem",
+              "fontWeight": "400"
+            }
+          ]
+        }
+      },
+    },
+  }</script></head><body class="bg-surface text-on-surface font-body-md text-body-md antialiased selection:bg-primary-container selection:text-on-primary"><aside class="fixed left-0 top-0 h-full w-60 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between py-space-md px-space-md"><div class="flex flex-col gap-space-lg"><div class="h-12 w-full flex items-center justify-between px-space-xs"><div class="flex items-center gap-space-sm"><span class="font-headline-md text-headline-md font-bold tracking-tight text-primary-container">FB POST PRO</span></div><span class="font-caption text-caption text-primary-container bg-secondary-container/40 px-space-xs py-[2px] rounded font-medium">v1.2.4</span></div><nav class="flex flex-col gap-space-xs w-full" data-active-classes="bg-[#EFF6FF] text-[#2563EB] font-medium"><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-md text-label-md" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[20px]">space_dashboard</span><span>Tổng quan</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-md text-label-md" data-path="post" href="#"><span class="material-symbols-outlined text-[20px]">edit_square</span><span>Đăng bài Facebook</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-md text-label-md" data-path="accounts" href="#"><span class="material-symbols-outlined text-[20px]">group</span><span>Tài khoản Facebook</span></a></nav></div><div class="flex flex-col gap-space-xs w-full"><nav class="flex flex-col gap-space-xs w-full" data-active-classes="bg-[#EFF6FF] text-[#2563EB] font-medium"><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-md text-label-md" data-path="pricing" href="#"><span class="material-symbols-outlined text-[20px]">account_balance_wallet</span><span>Gói dịch vụ</span></a></nav></div></aside><div class="pl-60"><header class="fixed top-0 left-60 right-0 h-[60px] bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-space-xl"><div class="flex flex-col justify-center"><div class="flex items-center gap-space-sm"><h1 class="font-headline-md text-headline-md text-on-surface tracking-tight font-semibold leading-tight">Tổng quan</h1></div><p class="font-caption text-caption text-on-surface-variant leading-none">Theo dõi tác vụ đăng bài</p></div><div class="flex items-center gap-space-lg"><div class="inline-flex items-center gap-space-xs bg-surface-container-low px-space-md py-space-xs rounded-lg"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span class="font-label-sm text-label-sm text-on-surface font-medium">Đã kết nối</span><span class="font-caption text-caption text-on-surface-variant bg-surface-container px-space-xs rounded">v1.2.4</span></div><button class="h-8 px-space-lg bg-surface-container-low text-on-surface font-label-md text-label-md rounded-lg hover:bg-surface-container-high hover:text-on-surface transition-colors flex items-center gap-space-xs" type="button"><span class="material-symbols-outlined text-[16px]">extension</span><span>Cài đặt Extension</span></button><button class="h-8 px-space-lg bg-primary-container text-on-primary font-label-md text-label-md rounded-lg hover:bg-primary transition-colors flex items-center gap-space-xs font-medium" type="button"><span class="material-symbols-outlined text-[16px]">bolt</span><span>Mua gói</span></button><div class="h-6 w-[1px] bg-surface-container-highest"></div><div class="flex items-center gap-space-md pl-space-xs cursor-pointer group"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-1 ring-surface-container-highest" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDoPt2G-DdhuVSX23NxMldNzHQLvBXK1wtA3lygmb_hJb16EDKYH5JRR9JYpMPGln0xklIblxyRfEqPqYgboDI8SA3h3bffhPD-24kQ9R7UZ-eTqU1MljiSTG811g4dvtgpe7rxZNcMxqZB2_XCQIXeA5P6rDTTtk4GaTDvvah5d6EkmvL0ga_x60iszCTiMK2fxac7-B993d0rjfhBsnhAXjAvZ-oP_svzZpPworo"/><div class="flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface font-medium leading-tight">Nguyễn Minh Anh</span><span class="font-caption text-caption text-primary font-medium leading-none">Gói PRO</span></div><span class="material-symbols-outlined text-[18px] text-on-surface-variant group-hover:text-on-surface transition-colors">arrow_drop_down</span></div></div></header><main class="w-full pt-[60px] p-[20px] bg-surface min-h-screen"><div class="flex flex-col w-full">
+<div class="flex flex-col gap-space-xl w-full max-w-[1720px] mx-auto pb-16">
+<!-- Top Meta Breadcrumb / Status Banner -->
+<div class="flex flex-wrap items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-sm">
+<span class="font-label-md text-label-md text-on-surface-variant">Cài đặt tài khoản</span>
+<span class="material-symbols-outlined text-[14px] text-outline">chevron_right</span>
+<span class="font-label-md text-label-md text-primary font-semibold">Gói dịch vụ &amp; Thanh toán</span>
+</div>
+<div class="flex items-center gap-space-md">
+<span class="font-caption text-caption text-on-surface-variant flex items-center gap-space-xs bg-surface-container-low px-space-md py-space-xs rounded-lg">
+<span class="material-symbols-outlined text-[16px] text-primary">verified_user</span>
+          Giao dịch mã hóa SSL 256-bit chuẩn PCI-DSS
+        </span>
+<div class="flex items-center gap-space-xs text-caption font-caption text-secondary">
+<span>Hệ thống tự động kích hoạt sau</span>
+<span class="font-semibold text-primary">30 giây</span>
+</div>
+</div>
+</div>
+<!-- SECTION 1: Active Subscription & Resource Consumption Status (Bento Grid) -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-gutter">
+<!-- Current Plan Status Card (5 cols) -->
+<div class="xl:col-span-5 bg-surface-container-lowest p-space-xl rounded-xl shadow-sm flex flex-col justify-between relative overflow-hidden">
+<div class="absolute -right-8 -top-8 w-40 h-40 bg-gradient-to-br from-primary-fixed/40 to-transparent rounded-full blur-2xl pointer-events-none"></div>
+<div class="flex flex-col gap-space-md relative z-10">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-primary font-semibold">Gói đang sử dụng</span>
+<span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-space-sm py-[2px] rounded text-label-sm font-label-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                ACTIVE (Đang hoạt động)
+              </span>
+</div>
+<span class="font-caption text-caption text-on-surface-variant bg-surface-container-low px-space-sm py-[2px] rounded font-medium">Chu kỳ: YEARLY (Năm)</span>
+</div>
+<div class="flex items-baseline justify-between mt-space-xs">
+<div>
+<h2 class="font-headline-xl text-headline-xl text-on-surface font-bold">Gói PRO</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Giải pháp đăng bài tối ưu hóa cho nhà bán hàng Facebook chuyên nghiệp</p>
+</div>
+<div class="text-right">
+<span class="font-headline-lg text-headline-lg font-bold text-primary">Còn 83 ngày</span>
+<p class="font-caption text-caption text-on-surface-variant">Thời hạn kết thúc chu kỳ</p>
+</div>
+</div>
+<!-- Dates metadata row -->
+<div class="grid grid-cols-2 gap-space-md p-space-md bg-surface-container-low rounded-lg mt-space-xs">
+<div class="flex flex-col">
+<span class="font-caption text-caption text-on-surface-variant">Ngày bắt đầu</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold">15/01/2024</span>
+</div>
+<div class="flex flex-col">
+<span class="font-caption text-caption text-on-surface-variant">Ngày hết hạn</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold text-primary">15/01/2025</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-space-md mt-space-lg pt-space-md relative z-10">
+<button class="h-8 px-space-xl bg-primary-container text-on-primary font-label-md text-label-md rounded-lg hover:bg-primary transition-colors flex items-center justify-center gap-space-xs font-semibold flex-1" onclick="document.getElementById('checkoutModal').scrollIntoView({behavior: 'smooth'})" type="button">
+<span class="material-symbols-outlined text-[16px]">upgrade</span>
+<span>Nâng cấp gói</span>
+</button>
+<button class="h-8 px-space-xl bg-surface-container text-on-surface font-label-md text-label-md rounded-lg hover:bg-surface-container-high transition-colors flex items-center justify-center gap-space-xs font-medium" onclick="document.getElementById('plansSection').scrollIntoView({behavior: 'smooth'})" type="button">
+<span class="material-symbols-outlined text-[16px]">autorenew</span>
+<span>Gia hạn gói</span>
+</button>
+</div>
+</div>
+<!-- Resource Limits & Consumption (7 cols) -->
+<div class="xl:col-span-7 bg-surface-container-lowest p-space-xl rounded-xl shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-space-md">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface font-semibold">Hạn mức tài nguyên hệ thống</h3>
+<p class="font-caption text-caption text-on-surface-variant">Đồng bộ trực tiếp từ Database Contract người dùng</p>
+</div>
+<span class="font-caption text-caption text-on-surface-variant bg-surface-container-low px-space-sm py-1 rounded">Dữ liệu theo thời gian thực</span>
+</div>
+<div class="flex flex-col gap-space-lg mt-space-md">
+<!-- Resource 1: Facebook Accounts -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between font-label-md text-label-md">
+<span class="flex items-center gap-space-xs text-on-surface font-medium">
+<span class="material-symbols-outlined text-[18px] text-primary">account_circle</span>
+                  Tài khoản Facebook (plans.max_facebook_accounts)
+                </span>
+<div class="flex items-center gap-space-sm">
+<span class="font-semibold text-error">3 / 3 tài khoản</span>
+<span class="font-caption text-caption bg-red-50 text-red-700 px-space-xs py-[2px] rounded font-medium">100% - Đạt giới hạn gói</span>
+</div>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-error h-full rounded-full transition-all duration-500" style="width: 100%"></div>
+</div>
+<p class="font-caption text-caption text-on-surface-variant">Cần nâng cấp lên Business để liên kết thêm tối đa 5 tài khoản vận hành.</p>
+</div>
+<!-- Resource 2: Saved Groups -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between font-label-md text-label-md">
+<span class="flex items-center gap-space-xs text-on-surface font-medium">
+<span class="material-symbols-outlined text-[18px] text-primary">groups</span>
+                  Nhóm đã lưu (plans.max_saved_groups)
+                </span>
+<div class="flex items-center gap-space-sm">
+<span class="font-semibold text-on-surface">248 / 500 nhóm</span>
+<span class="font-caption text-caption bg-blue-50 text-blue-700 px-space-xs py-[2px] rounded font-medium">49.6% - Dung lượng ổn định</span>
+</div>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-primary-container h-full rounded-full transition-all duration-500" style="width: 49.6%"></div>
+</div>
+<p class="font-caption text-caption text-on-surface-variant">Bạn còn 252 vị trí nhóm lưu trữ sẵn sàng cho chiến dịch phủ rộng.</p>
+</div>
+<!-- Resource 3: Scheduled Tasks -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between font-label-md text-label-md">
+<span class="flex items-center gap-space-xs text-on-surface font-medium">
+<span class="material-symbols-outlined text-[18px] text-primary">schedule_send</span>
+                  Tác vụ chờ lịch (plans.max_scheduled_tasks)
+                </span>
+<div class="flex items-center gap-space-sm">
+<span class="font-semibold text-on-surface">5 / 10 tác vụ</span>
+<span class="font-caption text-caption bg-amber-50 text-amber-700 px-space-xs py-[2px] rounded font-medium">50.0% - Đang hoạt động</span>
+</div>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-amber-500 h-full rounded-full transition-all duration-500" style="width: 50%"></div>
+</div>
+<p class="font-caption text-caption text-on-surface-variant">5 bài đăng đang trong hàng đợi chờ bot Extension kích hoạt tự động theo giờ vàng.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- SECTION 2: Pricing Matrix & Subscription Toggle -->
+<div class="flex flex-col gap-space-lg w-full mt-space-md" id="plansSection">
+<!-- Section Title & Cycle Toggle -->
+<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-md">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface font-bold tracking-tight">Bảng giá dịch vụ</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Đầu tư chính xác theo quy mô vận hành tài nguyên nhóm Facebook của bạn</p>
+</div>
+<!-- Billing Period Toggle -->
+<div class="flex items-center p-1 bg-surface-container-low rounded-lg shadow-sm">
+<button class="px-space-lg py-1 rounded-md text-label-md font-label-md font-medium text-on-surface-variant hover:text-on-surface transition-all" id="toggleMonthly" onclick="setBillingCycle('monthly')" type="button">
+            Theo tháng
+          </button>
+<button class="px-space-lg py-1 rounded-md text-label-md font-label-md font-semibold bg-surface-container-lowest text-primary shadow-sm transition-all flex items-center gap-space-xs" id="toggleYearly" onclick="setBillingCycle('yearly')" type="button">
+<span>Theo năm</span>
+<span class="text-caption font-caption bg-amber-100 text-amber-800 px-space-xs py-[1px] rounded font-bold">Tiết kiệm 2 tháng - Ưu đãi 17%</span>
+</button>
+</div>
+</div>
+<!-- 3 Tier Cards according to Contract -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter items-stretch">
+<!-- PLAN 1: BASIC -->
+<div class="bg-surface-container-lowest rounded-xl p-space-xl shadow-sm flex flex-col justify-between transition-all hover:shadow-md">
+<div class="flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<span class="font-headline-md text-headline-md text-on-surface font-bold">Gói BASIC</span>
+<span class="font-caption text-caption text-secondary bg-surface-container px-space-sm py-[2px] rounded font-medium">Khởi sự</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Thích hợp cho cá nhân kinh doanh đơn lẻ mới bắt đầu tiếp cận nhóm tự động.</p>
+<div class="my-space-sm">
+<div class="flex items-baseline gap-space-xs price-yearly">
+<span class="font-headline-xl text-headline-xl font-bold text-on-surface">490.000đ</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">/ năm</span>
+</div>
+<div class="flex items-baseline gap-space-xs price-monthly hidden">
+<span class="font-headline-xl text-headline-xl font-bold text-on-surface">49.000đ</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">/ tháng</span>
+</div>
+<span class="font-caption text-caption text-on-surface-variant block mt-1">Khoảng 40.800đ/tháng khi trả cả năm</span>
+</div>
+<div class="w-full h-[1px] bg-surface-container"></div>
+<div class="flex flex-col gap-space-sm py-space-xs">
+<span class="font-caption text-caption uppercase tracking-wider text-outline font-semibold">Hạn mức tài nguyên</span>
+<div class="flex items-center gap-space-sm text-label-md font-label-md text-on-surface">
+<span class="material-symbols-outlined text-[18px] text-primary">check_circle</span>
+<span><strong>1</strong> tài khoản Facebook</span>
+</div>
+<div class="flex items-center gap-space-sm text-label-md font-label-md text-on-surface">
+<span class="material-symbols-outlined text-[18px] text-primary">check_circle</span>
+<span><strong>100</strong> nhóm lưu trữ</span>
+</div>
+<div class="flex items-center gap-space-sm text-label-md font-label-md text-on-surface">
+<span class="material-symbols-outlined text-[18px] text-primary">check_circle</span>
+<span><strong>3</strong> tác vụ chờ lịch</span>
+</div>
+</div>
+</div>
+<div class="mt-space-xl pt-space-md">
+<button class="w-full h-9 bg-surface-container text-on-surface font-label-md text-label-md rounded-lg hover:bg-surface-container-high transition-colors font-medium flex items-center justify-center gap-space-xs" type="button">
+<span>Hạ cấp xuống Basic</span>
+</button>
+</div>
+</div>
+<!-- PLAN 2: PRO (CURRENT / POPULAR) -->
+<div class="bg-surface-container-lowest rounded-xl p-space-xl shadow-md flex flex-col justify-between relative overflow-hidden ring-2 ring-primary-container">
+<div class="absolute top-0 right-0">
+<span class="bg-primary-container text-on-primary font-caption text-caption px-space-md py-1 rounded-bl-lg font-semibold uppercase tracking-wider flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-[14px]">star</span>
+              Gói bạn đang dùng
+            </span>
+</div>
+<div class="flex flex-col gap-space-md">
+<div class="flex items-center gap-space-xs">
+<span class="font-headline-md text-headline-md text-primary font-bold">Gói PRO</span>
+<span class="font-caption text-caption text-primary bg-primary-fixed px-space-sm py-[2px] rounded font-semibold">Phổ biến nhất</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Giải pháp chuẩn cho nhà bán lẻ, đại lý phân phối và người làm dịch vụ cộng đồng.</p>
+<div class="my-space-sm">
+<div class="flex items-baseline gap-space-xs price-yearly">
+<span class="font-headline-xl text-headline-xl font-bold text-primary">990.000đ</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">/ năm</span>
+</div>
+<div class="flex items-baseline gap-space-xs price-monthly hidden">
+<span class="font-headline-xl text-headline-xl font-bold text-primary">99.000đ</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">/ tháng</span>
+</div>
+<span class="font-caption text-caption text-emerald-700 font-medium block mt-1">Tiết kiệm 198.000đ khi thanh toán 12 tháng</span>
+</div>
+<div class="w-full h-[1px] bg-surface-container"></div>
+<div class="flex flex-col gap-space-sm py-space-xs">
+<span class="font-caption text-caption uppercase tracking-wider text-outline font-semibold">Hạn mức tài nguyên</span>
+<div class="flex items-center gap-space-sm text-label-md font-label-md text-on-surface">
+<span class="material-symbols-outlined text-[18px] text-primary">check_circle</span>
+<span><strong>3</strong> tài khoản Facebook</span>
+</div>
+<div class="flex items-center gap-space-sm text-label-md font-label-md text-on-surface">
+<span class="material-symbols-outlined text-[18px] text-primary">check_circle</span>
+<span><strong>500</strong> nhóm lưu trữ</span>
+</div>
+<div class="flex items-center gap-space-sm text-label-md font-label-md text-on-surface">
+<span class="material-symbols-outlined text-[18px] text-primary">check_circle</span>
+<span><strong>10</strong> tác vụ chờ lịch</span>
+</div>
+</div>
+</div>
+<div class="mt-space-xl pt-space-md">
+<button class="w-full h-9 bg-primary-container text-on-primary font-label-md text-label-md rounded-lg hover:bg-primary transition-colors font-semibold flex items-center justify-center gap-space-xs shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">autorenew</span>
+<span>Gia hạn gói PRO</span>
+</button>
+</div>
+</div>
+<!-- PLAN 3: BUSINESS -->
+<div class="bg-surface-container-lowest rounded-xl p-space-xl shadow-sm flex flex-col justify-between transition-all hover:shadow-md bg-gradient-to-b from-surface-container-lowest via-surface-container-lowest to-surface-container-low/40">
+<div class="flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<span class="font-headline-md text-headline-md text-on-surface font-bold">Gói BUSINESS</span>
+<span class="font-caption text-caption text-on-tertiary-container bg-tertiary-fixed px-space-sm py-[2px] rounded font-semibold">Quy mô lớn</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Dành cho Agency, đội nhóm làm affiliate marketing và doanh nghiệp đa chi nhánh.</p>
+<div class="my-space-sm">
+<div class="flex items-baseline gap-space-xs price-yearly">
+<span class="font-headline-xl text-headline-xl font-bold text-on-surface">1.990.000đ</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">/ năm</span>
+</div>
+<div class="flex items-baseline gap-space-xs price-monthly hidden">
+<span class="font-headline-xl text-headline-xl font-bold text-on-surface">199.000đ</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">/ tháng</span>
+</div>
+<span class="font-caption text-caption text-emerald-700 font-medium block mt-1">Đầy đủ tính năng cao cấp &amp; ưu tiên bot xử lý</span>
+</div>
+<div class="w-full h-[1px] bg-surface-container"></div>
+<div class="flex flex-col gap-space-sm py-space-xs">
+<span class="font-caption text-caption uppercase tracking-wider text-outline font-semibold">Hạn mức tài nguyên</span>
+<div class="flex items-center gap-space-sm text-label-md font-label-md text-on-surface">
+<span class="material-symbols-outlined text-[18px] text-primary">check_circle</span>
+<span><strong>5</strong> tài khoản Facebook</span>
+</div>
+<div class="flex items-center gap-space-sm text-label-md font-label-md text-on-surface">
+<span class="material-symbols-outlined text-[18px] text-primary">check_circle</span>
+<span><strong>2.000</strong> nhóm lưu trữ</span>
+</div>
+<div class="flex items-center gap-space-sm text-label-md font-label-md text-on-surface">
+<span class="material-symbols-outlined text-[18px] text-primary">check_circle</span>
+<span><strong>30</strong> tác vụ chờ lịch</span>
+</div>
+</div>
+</div>
+<div class="mt-space-xl pt-space-md">
+<button class="w-full h-9 bg-primary-container text-on-primary font-label-md text-label-md rounded-lg hover:bg-primary transition-colors font-semibold flex items-center justify-center gap-space-xs shadow-sm" onclick="document.getElementById('checkoutModal').scrollIntoView({behavior: 'smooth'})" type="button">
+<span class="material-symbols-outlined text-[16px]">bolt</span>
+<span>Nâng cấp lên Business</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- SECTION 3: Payment Checkout Interface (VietQR BILL-04 / BILL-05 / BILL-06) -->
+<div class="w-full bg-surface-container-lowest rounded-xl p-space-xl shadow-md mt-space-md relative overflow-hidden" id="checkoutModal">
+<div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-space-md pb-space-lg mb-space-lg">
+<div>
+<div class="flex items-center gap-space-sm">
+<span class="font-headline-lg text-headline-lg font-bold text-on-surface">Thanh toán gói dịch vụ</span>
+<span class="font-caption text-caption bg-amber-50 text-amber-700 px-space-sm py-[2px] rounded font-semibold flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+              Đơn hàng đang chờ thanh toán
+            </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Quét mã QR VietQR từ bất kỳ ứng dụng ngân hàng di động nào để kích hoạt tự động tức thì.</p>
+</div>
+<!-- Countdown Timer BILL-04 -->
+<div class="flex items-center gap-space-md bg-surface-container-low px-space-lg py-space-sm rounded-lg">
+<span class="material-symbols-outlined text-[20px] text-amber-600">timer</span>
+<div class="flex flex-col">
+<span class="font-caption text-caption text-on-surface-variant">Thời gian thanh toán còn lại</span>
+<span class="font-headline-md text-headline-md font-bold text-error tracking-wider leading-none" id="countdownDisplay">14:58</span>
+</div>
+</div>
+</div>
+<!-- Main Payment Split Panel -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
+<!-- Left: VietQR Code Generator Box (5 cols) -->
+<div class="lg:col-span-5 bg-surface-container-low/70 p-space-xl rounded-xl flex flex-col items-center justify-center text-center">
+<!-- Bank Branding Header -->
+<div class="flex items-center justify-between w-full mb-space-md px-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="w-7 h-7 rounded bg-blue-700 text-white font-bold flex items-center justify-center text-[10px]">MB</span>
+<div class="flex flex-col text-left">
+<span class="font-label-sm text-label-sm font-bold text-on-surface leading-tight">MBBank</span>
+<span class="font-caption text-caption text-on-surface-variant leading-none">Ngân hàng TMCP Quân Đội</span>
+</div>
+</div>
+<div class="inline-flex items-center gap-1 bg-surface-container-lowest px-space-xs py-1 rounded shadow-sm">
+<span class="font-label-sm text-label-sm font-bold text-primary">Viet</span><span class="font-label-sm text-label-sm font-bold text-red-600">QR</span>
+</div>
+</div>
+<!-- Dynamic QR Canvas Container -->
+<div class="bg-white p-space-md rounded-xl shadow-sm relative group flex items-center justify-center">
+<!-- Inline SVG Mock representing dynamic VietQR code with center logo -->
+<svg class="w-60 h-60 text-slate-900" fill="none" viewbox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+<rect fill="white" height="200" rx="8" width="200"></rect>
+<!-- Corner Squares -->
+<rect fill="currentColor" height="46" rx="4" width="46" x="14" y="14"></rect>
+<rect fill="white" height="30" rx="2" width="30" x="22" y="22"></rect>
+<rect fill="currentColor" height="18" rx="1" width="18" x="28" y="28"></rect>
+<rect fill="currentColor" height="46" rx="4" width="46" x="140" y="14"></rect>
+<rect fill="white" height="30" rx="2" width="30" x="148" y="22"></rect>
+<rect fill="currentColor" height="18" rx="1" width="18" x="154" y="28"></rect>
+<rect fill="currentColor" height="46" rx="4" width="46" x="14" y="140"></rect>
+<rect fill="white" height="30" rx="2" width="30" x="22" y="148"></rect>
+<rect fill="currentColor" height="18" rx="1" width="18" x="28" y="154"></rect>
+<!-- Grid data modules representation -->
+<path d="M70 18h10v10H70zm20 0h10v10H90zm20 0h10v10h-10zm-40 20h20v10H70zm30 0h10v10h-10zm20 0h10v10h-10zm-50 20h10v10H70zm20 0h20v10H90zm30 0h10v10h-10zm10 0h10v10h-10zm-70 20h10v10H70zm40 0h20v10h-20zm-40 20h10v10H70zm30 0h10v10h-10zm20 0h20v10h-20zm-50 20h10v10H70zm20 0h10v10H90zm30 0h10v10h-10zm-50 20h20v10H70zm30 0h10v10h-10zm20 0h20v10h-20z" fill="currentColor"></path>
+<path d="M18 70h10v10H18zm20 0h10v10H38zm20 0h10v10H58zm82 0h10v10h-10zm20 0h10v10h-10zm-122 20h10v10H18zm30 0h10v10H48zm82 0h20v10h-20zm-112 20h20v10H18zm30 0h10v10H48zm82 0h10v10h-10zm20 0h10v10h-10z" fill="currentColor"></path>
+<!-- Center Logo badge -->
+<rect fill="#2563EB" height="40" rx="6" width="40" x="80" y="80"></rect>
+<path d="M89 95h22v3H89zm0 7h15v3H89zm0-14h22v3H89z" fill="white"></path>
+</svg>
+<!-- Refresh indicator hint -->
+<div class="absolute bottom-2 right-2 bg-surface-container-lowest/90 px-1.5 py-0.5 rounded text-[10px] text-on-surface-variant font-caption">
+              VietQR 2.0
+            </div>
+</div>
+<p class="font-caption text-caption text-on-surface-variant mt-space-md max-w-xs">
+            Mở App ngân hàng bất kỳ (Vietcombank, MB, Techcombank, VPBank...) chọn chức năng <strong>Quét mã QR</strong>
+</p>
+</div>
+<!-- Right: Order Details & Copy Actions (7 cols) -->
+<div class="lg:col-span-7 flex flex-col justify-between h-full gap-space-lg">
+<div class="flex flex-col gap-space-md">
+<!-- Summary Header Box -->
+<div class="p-space-lg bg-surface-container-low rounded-lg flex flex-wrap items-center justify-between gap-space-md">
+<div class="flex flex-col">
+<span class="font-caption text-caption text-on-surface-variant">Gói dịch vụ đã chọn</span>
+<span class="font-headline-md text-headline-md font-bold text-on-surface">Gói BUSINESS (1 Năm)</span>
+<span class="font-caption text-caption text-primary">Tài nguyên: 5 TK Facebook / 2.000 nhóm / 30 tác vụ</span>
+</div>
+<div class="text-right">
+<span class="font-caption text-caption text-on-surface-variant">Tổng tiền thanh toán</span>
+<div class="font-headline-xl text-headline-xl font-bold text-primary" id="amountVal">1.990.000 VNĐ</div>
+</div>
+</div>
+<!-- Detail specs table with copy action buttons -->
+<div class="flex flex-col gap-space-xs bg-surface-container-lowest rounded-lg">
+<!-- Field 1: Order ID -->
+<div class="flex items-center justify-between p-space-sm hover:bg-surface-container-low rounded-lg transition-colors">
+<div class="flex flex-col">
+<span class="font-caption text-caption text-on-surface-variant">Mã đơn hàng</span>
+<span class="font-label-md text-label-md font-semibold text-on-surface" id="orderIdText">ORD-20241024-8902</span>
+</div>
+<button class="h-7 px-space-md bg-surface-container text-on-surface rounded font-label-sm text-label-sm hover:bg-surface-container-high transition-colors flex items-center gap-1 font-medium" onclick="copyValue('ORD-20241024-8902', 'Đã sao chép mã đơn hàng!')" type="button">
+<span class="material-symbols-outlined text-[14px]">content_copy</span>
+<span>Sao chép</span>
+</button>
+</div>
+<!-- Field 2: Bank Beneficiary -->
+<div class="flex items-center justify-between p-space-sm hover:bg-surface-container-low rounded-lg transition-colors">
+<div class="flex flex-col">
+<span class="font-caption text-caption text-on-surface-variant">Ngân hàng thụ hưởng</span>
+<span class="font-label-md text-label-md font-semibold text-on-surface">MBBank (Quân Đội) - CN Hà Nội</span>
+</div>
+<span class="font-caption text-caption text-secondary">Hỗ trợ 24/7 NAPAS 247</span>
+</div>
+<!-- Field 3: Account Number -->
+<div class="flex items-center justify-between p-space-sm hover:bg-surface-container-low rounded-lg transition-colors">
+<div class="flex flex-col">
+<span class="font-caption text-caption text-on-surface-variant">Số tài khoản</span>
+<span class="font-headline-md text-headline-md font-bold text-on-surface tracking-wider font-mono" id="accNumText">0868889999</span>
+</div>
+<button class="h-7 px-space-md bg-surface-container text-on-surface rounded font-label-sm text-label-sm hover:bg-surface-container-high transition-colors flex items-center gap-1 font-medium" onclick="copyValue('0868889999', 'Đã sao chép số tài khoản!')" type="button">
+<span class="material-symbols-outlined text-[14px]">content_copy</span>
+<span>Sao chép</span>
+</button>
+</div>
+<!-- Field 4: Account Name -->
+<div class="flex items-center justify-between p-space-sm hover:bg-surface-container-low rounded-lg transition-colors">
+<div class="flex flex-col">
+<span class="font-caption text-caption text-on-surface-variant">Chủ tài khoản thụ hưởng</span>
+<span class="font-label-md text-label-md font-semibold text-on-surface uppercase">CONG TY FB POST PRO</span>
+</div>
+<span class="material-symbols-outlined text-[18px] text-emerald-600">verified</span>
+</div>
+<!-- Field 5: Transfer Memo -->
+<div class="flex items-center justify-between p-space-sm bg-primary-fixed/30 rounded-lg">
+<div class="flex flex-col">
+<span class="font-caption text-caption text-primary font-semibold">Nội dung chuyển khoản (Bắt buộc chính xác)</span>
+<span class="font-headline-md text-headline-md font-bold text-primary font-mono" id="transferMemoText">FBPAY ORD8902</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<button class="h-7 px-space-md bg-primary-container text-on-primary rounded font-label-sm text-label-sm hover:bg-primary transition-colors flex items-center gap-1 font-medium shadow-sm" onclick="copyValue('FBPAY ORD8902', 'Đã sao chép nội dung chuyển khoản!')" type="button">
+<span class="material-symbols-outlined text-[14px]">content_copy</span>
+<span>Sao chép nội dung</span>
+</button>
+</div>
+</div>
+<!-- Field 6: Exact Transfer Amount -->
+<div class="flex items-center justify-between p-space-sm hover:bg-surface-container-low rounded-lg transition-colors">
+<div class="flex flex-col">
+<span class="font-caption text-caption text-on-surface-variant">Số tiền cần chuyển</span>
+<span class="font-headline-md text-headline-md font-bold text-primary">1.990.000 đ</span>
+</div>
+<button class="h-7 px-space-md bg-surface-container text-on-surface rounded font-label-sm text-label-sm hover:bg-surface-container-high transition-colors flex items-center gap-1 font-medium" onclick="copyValue('1990000', 'Đã sao chép số tiền!')" type="button">
+<span class="material-symbols-outlined text-[14px]">content_copy</span>
+<span>Sao chép số tiền</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Action Buttons Bar (BILL-06 Webhook Simulation) -->
+<div class="flex flex-wrap items-center justify-between gap-space-md pt-space-md">
+<div class="flex items-center gap-space-xs text-caption font-caption text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px] text-emerald-600">sync</span>
+<span>Webhook VietQR sẽ tự xác nhận sau khi nhận thông báo có biến động số dư.</span>
+</div>
+<div class="flex items-center gap-space-md">
+<button class="h-9 px-space-xl bg-primary-container text-on-primary font-label-md text-label-md rounded-lg hover:bg-primary transition-colors flex items-center gap-space-xs font-semibold shadow-sm" id="checkPaymentBtn" onclick="verifyPaymentStatus()" type="button">
+<span class="material-symbols-outlined text-[18px]" id="checkSpinner">hourglass_bottom</span>
+<span id="checkBtnLabel">Kiểm tra trạng thái thanh toán</span>
+</button>
+</div>
+</div>
+<!-- Toast Notification Bar (Hidden by default) -->
+<div class="hidden p-space-md bg-emerald-50 text-emerald-900 rounded-lg flex items-center gap-space-sm text-label-md font-label-md" id="toastSuccess">
+<span class="material-symbols-outlined text-emerald-600 text-[20px]">check_circle</span>
+<span id="toastMessage">Thông tin đã được sao chép vào bộ nhớ tạm!</span>
+</div>
+</div>
+</div>
+</div>
+<!-- SECTION 4: Payment History (Mục 9.6: payment_orders Table) -->
+<div class="flex flex-col gap-space-md w-full mt-space-md bg-surface-container-lowest rounded-xl p-space-xl shadow-sm">
+<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-md">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface font-bold">Lịch sử đơn hàng &amp; Thanh toán</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Theo dõi chi tiết tất cả các chu kỳ đăng ký gói cước và hóa đơn VAT điện tử</p>
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="relative">
+<input class="h-8 pl-8 pr-space-md bg-surface-container-low text-on-surface rounded-lg font-body-sm text-body-sm placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary w-56" placeholder="Tìm kiếm theo mã đơn..." type="text"/>
+<span class="material-symbols-outlined text-[16px] text-outline absolute left-2.5 top-2">search</span>
+</div>
+<button class="h-8 px-space-md bg-surface-container text-on-surface rounded-lg font-label-md text-label-md hover:bg-surface-container-high transition-colors flex items-center gap-1 font-medium" type="button">
+<span class="material-symbols-outlined text-[16px]">filter_list</span>
+<span>Bộ lọc</span>
+</button>
+</div>
+</div>
+<!-- Data Table -->
+<div class="w-full overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider h-9">
+<th class="px-space-md py-space-xs font-semibold rounded-l-lg">Mã đơn hàng</th>
+<th class="px-space-md py-space-xs font-semibold">Gói dịch vụ</th>
+<th class="px-space-md py-space-xs font-semibold">Chu kỳ</th>
+<th class="px-space-md py-space-xs font-semibold">Số tiền</th>
+<th class="px-space-md py-space-xs font-semibold">Ngày tạo</th>
+<th class="px-space-md py-space-xs font-semibold">Ngày thanh toán</th>
+<th class="px-space-md py-space-xs font-semibold">Trạng thái</th>
+<th class="px-space-md py-space-xs font-semibold text-right rounded-r-lg">Thao tác</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container font-body-sm text-body-sm text-on-surface">
+<!-- Row 1: Current Pending Order -->
+<tr class="hover:bg-surface-container-low/50 transition-colors h-11 bg-primary-fixed/10">
+<td class="px-space-md py-space-xs font-semibold font-mono text-primary">
+                ORD-20241024-8902
+              </td>
+<td class="px-space-md py-space-xs font-medium">
+<span class="inline-flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-blue-600"></span>
+                  Gói BUSINESS
+                </span>
+</td>
+<td class="px-space-md py-space-xs text-on-surface-variant">
+                1 Năm (Yearly)
+              </td>
+<td class="px-space-md py-space-xs font-semibold text-on-surface">
+                1.990.000 đ
+              </td>
+<td class="px-space-md py-space-xs text-on-surface-variant">
+                24/10/2024 10:15
+              </td>
+<td class="px-space-md py-space-xs text-on-surface-variant">
+                --
+              </td>
+<td class="px-space-md py-space-xs">
+<span class="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-space-xs py-[2px] rounded text-label-sm font-label-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                  PENDING (Chờ thanh toán)
+                </span>
+</td>
+<td class="px-space-md py-space-xs text-right">
+<button class="h-7 px-space-sm bg-primary-container text-on-primary rounded font-label-sm text-label-sm hover:bg-primary transition-colors font-medium" onclick="document.getElementById('checkoutModal').scrollIntoView({behavior: 'smooth'})" type="button">
+                  Thanh toán ngay
+                </button>
+</td>
+</tr>
+<!-- Row 2: Active Plan Initial Payment -->
+<tr class="hover:bg-surface-container-low/50 transition-colors h-11">
+<td class="px-space-md py-space-xs font-semibold font-mono text-on-surface">
+                ORD-20240115-4105
+              </td>
+<td class="px-space-md py-space-xs font-medium">
+<span class="inline-flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                  Gói PRO
+                </span>
+</td>
+<td class="px-space-md py-space-xs text-on-surface-variant">
+                1 Năm (Yearly)
+              </td>
+<td class="px-space-md py-space-xs font-semibold text-on-surface">
+                990.000 đ
+              </td>
+<td class="px-space-md py-space-xs text-on-surface-variant">
+                15/01/2024 09:12
+              </td>
+<td class="px-space-md py-space-xs text-on-surface-variant font-medium text-emerald-700">
+                15/01/2024 09:14
+              </td>
+<td class="px-space-md py-space-xs">
+<span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-space-xs py-[2px] rounded text-label-sm font-label-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  PAID (Đã thanh toán)
+                </span>
+</td>
+<td class="px-space-md py-space-xs text-right">
+<div class="inline-flex items-center gap-space-xs">
+<button class="w-7 h-7 flex items-center justify-center rounded bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface" title="Tải hóa đơn VAT" type="button">
+<span class="material-symbols-outlined text-[16px]">download</span>
+</button>
+<button class="w-7 h-7 flex items-center justify-center rounded bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface" title="Xem chi tiết giao dịch" type="button">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3: Past Basic Month -->
+<tr class="hover:bg-surface-container-low/50 transition-colors h-11">
+<td class="px-space-md py-space-xs font-semibold font-mono text-on-surface">
+                ORD-20231215-2291
+              </td>
+<td class="px-space-md py-space-xs font-medium">
+<span class="inline-flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                  Gói BASIC
+                </span>
+</td>
+<td class="px-space-md py-space-xs text-on-surface-variant">
+                1 Tháng (Monthly)
+              </td>
+<td class="px-space-md py-space-xs font-semibold text-on-surface">
+                49.000 đ
+              </td>
+<td class="px-space-md py-space-xs text-on-surface-variant">
+                15/12/2023 14:02
+              </td>
+<td class="px-space-md py-space-xs text-on-surface-variant font-medium text-emerald-700">
+                15/12/2023 14:03
+              </td>
+<td class="px-space-md py-space-xs">
+<span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-space-xs py-[2px] rounded text-label-sm font-label-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  PAID (Đã thanh toán)
+                </span>
+</td>
+<td class="px-space-md py-space-xs text-right">
+<div class="inline-flex items-center gap-space-xs">
+<button class="w-7 h-7 flex items-center justify-center rounded bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface" title="Tải hóa đơn VAT" type="button">
+<span class="material-symbols-outlined text-[16px]">download</span>
+</button>
+<button class="w-7 h-7 flex items-center justify-center rounded bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface" title="Xem chi tiết giao dịch" type="button">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 4: Expired Unpaid Order -->
+<tr class="hover:bg-surface-container-low/50 transition-colors h-11">
+<td class="px-space-md py-space-xs font-semibold font-mono text-outline">
+                ORD-20231210-1840
+              </td>
+<td class="px-space-md py-space-xs text-outline">
+<span class="inline-flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                  Gói PRO
+                </span>
+</td>
+<td class="px-space-md py-space-xs text-outline">
+                1 Tháng (Monthly)
+              </td>
+<td class="px-space-md py-space-xs font-semibold text-outline">
+                99.000 đ
+              </td>
+<td class="px-space-md py-space-xs text-outline">
+                10/12/2023 18:30
+              </td>
+<td class="px-space-md py-space-xs text-outline">
+                --
+              </td>
+<td class="px-space-md py-space-xs">
+<span class="inline-flex items-center gap-1 bg-surface-container text-on-surface-variant px-space-xs py-[2px] rounded text-label-sm font-label-sm font-medium">
+                  EXPIRED (Hết hạn)
+                </span>
+</td>
+<td class="px-space-md py-space-xs text-right">
+<button class="h-7 px-space-sm bg-surface-container-low text-outline rounded font-label-sm text-label-sm cursor-not-allowed" type="button">
+                  Đã hủy
+                </button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination and Record Counter -->
+<div class="flex items-center justify-between pt-space-sm font-caption text-caption text-on-surface-variant">
+<span>Hiển thị 4 trên 4 đơn hàng gần nhất</span>
+<div class="flex items-center gap-space-xs">
+<button class="h-7 px-space-sm rounded bg-surface-container-low text-outline cursor-not-allowed font-medium" disabled="" type="button">Trước</button>
+<span class="px-space-sm py-1 bg-primary text-on-primary rounded font-semibold text-label-sm">1</span>
+<button class="h-7 px-space-sm rounded bg-surface-container-low text-outline cursor-not-allowed font-medium" disabled="" type="button">Sau</button>
+</div>
+</div>
+</div>
+<!-- Security & Support Footer Note -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter pt-space-sm text-on-surface-variant">
+<div class="flex items-start gap-space-sm bg-surface-container-lowest p-space-md rounded-xl shadow-sm">
+<span class="material-symbols-outlined text-primary text-[24px]">shield</span>
+<div>
+<h4 class="font-label-md text-label-md text-on-surface font-semibold">Tự động kích hoạt</h4>
+<p class="font-caption text-caption text-on-surface-variant">Sau khi tiền vào tài khoản, hệ thống tự động ghi nhận thanh toán trong 30 giây mà không cần can thiệp thủ công.</p>
+</div>
+</div>
+<div class="flex items-start gap-space-sm bg-surface-container-lowest p-space-md rounded-xl shadow-sm">
+<span class="material-symbols-outlined text-primary text-[24px]">receipt_long</span>
+<div>
+<h4 class="font-label-md text-label-md text-on-surface font-semibold">Hóa đơn điện tử VAT</h4>
+<p class="font-caption text-caption text-on-surface-variant">Hóa đơn hợp lệ theo Thông tư 78/2021/TT-BTC gửi thẳng về email doanh nghiệp sau khi thanh toán.</p>
+</div>
+</div>
+<div class="flex items-start gap-space-sm bg-surface-container-lowest p-space-md rounded-xl shadow-sm">
+<span class="material-symbols-outlined text-primary text-[24px]">support_agent</span>
+<div>
+<h4 class="font-label-md text-label-md text-on-surface font-semibold">Hỗ trợ kỹ thuật 24/7</h4>
+<p class="font-caption text-caption text-on-surface-variant">Khi cần điều chỉnh hạn mức nhóm chuyên biệt hoặc xử lý giao dịch chậm, hotline Zalo kỹ thuật luôn sẵn sàng.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Inline Client JavaScript for Pricing Toggle, Copy Actions & VietQR Status Checking -->
+<script>
+    // 1. Billing Cycle Toggle Handler
+    function setBillingCycle(cycle) {
+      const btnMonthly = document.getElementById('toggleMonthly');
+      const btnYearly = document.getElementById('toggleYearly');
+      const monthlyPrices = document.querySelectorAll('.price-monthly');
+      const yearlyPrices = document.querySelectorAll('.price-yearly');
+
+      if (cycle === 'yearly') {
+        btnYearly.className = 'px-space-lg py-1 rounded-md text-label-md font-label-md font-semibold bg-surface-container-lowest text-primary shadow-sm transition-all flex items-center gap-space-xs';
+        btnMonthly.className = 'px-space-lg py-1 rounded-md text-label-md font-label-md font-medium text-on-surface-variant hover:text-on-surface transition-all';
+        yearlyPrices.forEach(el => el.classList.remove('hidden'));
+        monthlyPrices.forEach(el => el.classList.add('hidden'));
+      } else {
+        btnMonthly.className = 'px-space-lg py-1 rounded-md text-label-md font-label-md font-semibold bg-surface-container-lowest text-primary shadow-sm transition-all';
+        btnYearly.className = 'px-space-lg py-1 rounded-md text-label-md font-label-md font-medium text-on-surface-variant hover:text-on-surface transition-all flex items-center gap-space-xs';
+        yearlyPrices.forEach(el => el.classList.add('hidden'));
+        monthlyPrices.forEach(el => el.classList.remove('hidden'));
+      }
+    }
+
+    // 2. Clipboard Copy Helper with Toast
+    function copyValue(text, message) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast(message || 'Đã sao chép vào bộ nhớ tạm!');
+      }).catch(() => {
+        showToast('Đã chọn thông tin: ' + text);
+      });
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toastSuccess');
+      const textElem = document.getElementById('toastMessage');
+      if (toast && textElem) {
+        textElem.textContent = msg;
+        toast.classList.remove('hidden');
+        setTimeout(() => {
+          toast.classList.add('hidden');
+        }, 3200);
+      }
+    }
+
+    // 3. Countdown Timer (14:58 start)
+    let totalSeconds = 14 * 60 + 58;
+    const countdownEl = document.getElementById('countdownDisplay');
+    if (countdownEl) {
+      const interval = setInterval(() => {
+        if (totalSeconds <= 0) {
+          clearInterval(interval);
+          countdownEl.textContent = '00:00';
+          return;
+        }
+        totalSeconds--;
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+        countdownEl.textContent = (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs;
+      }, 1000);
+    }
+
+    // 4. Verify Payment Status Simulation (BILL-06 Webhook test)
+    function verifyPaymentStatus() {
+      const btn = document.getElementById('checkPaymentBtn');
+      const label = document.getElementById('checkBtnLabel');
+      const spinner = document.getElementById('checkSpinner');
+      
+      btn.disabled = true;
+      spinner.classList.add('animate-spin');
+      label.textContent = 'Đang kiểm tra giao dịch VietQR...';
+
+      setTimeout(() => {
+        spinner.classList.remove('animate-spin');
+        btn.disabled = false;
+        label.textContent = 'Kiểm tra trạng thái thanh toán';
+        showToast('Chưa ghi nhận chuyển khoản cho ORD-20241024-8902. Vui lòng quét mã trên App ngân hàng!');
+      }, 1600);
+    }
+  </script>
+</div></main></div></body></html>

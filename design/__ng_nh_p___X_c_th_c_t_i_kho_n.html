@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@100..900&display=swap" rel="stylesheet"/><style>@layer base { html, body { margin: 0; padding: 0; } body { overscroll-behavior: none; } main > :first-child { margin-top: 0 !important; } main > :last-child { margin-bottom: 0 !important; } } ::-webkit-scrollbar { display: none; } .auth-pattern-bg { background-color: #faf8ff; background-image: radial-gradient(#c3c6d7 0.75px, transparent 0.75px); background-size: 16px 16px; }</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "surface-container-lowest": "#ffffff", "inverse-surface": "#283044", "on-error": "#ffffff", "on-tertiary": "#ffffff", "tertiary-container": "#bc4800", "secondary-fixed-dim": "#b7c8e1", "on-primary-container": "#eeefff", "on-surface": "#131b2e", "background": "#faf8ff", "surface-variant": "#dae2fd", "on-secondary-fixed-variant": "#38485d", "outline-variant": "#c3c6d7", "surface": "#faf8ff", "surface-container-low": "#f2f3ff", "error-container": "#ffdad6", "primary-container": "#2563eb", "surface-container-high": "#e2e7ff", "surface-dim": "#d2d9f4", "surface-container-highest": "#dae2fd", "on-tertiary-fixed-variant": "#7d2d00", "secondary": "#505f76", "primary-fixed-dim": "#b4c5ff", "surface-container": "#eaedff", "secondary-container": "#d0e1fb", "tertiary-fixed": "#ffdbcd", "secondary-fixed": "#d3e4fe", "inverse-on-surface": "#eef0ff", "on-primary-fixed": "#00174b", "on-error-container": "#93000a", "on-primary": "#ffffff", "on-secondary": "#ffffff", "on-tertiary-fixed": "#360f00", "outline": "#737686", "surface-bright": "#faf8ff", "tertiary": "#943700", "on-secondary-container": "#54647a", "surface-tint": "#0053db", "inverse-primary": "#b4c5ff", "primary-fixed": "#dbe1ff", "on-tertiary-container": "#ffede6", "on-surface-variant": "#434655", "on-primary-fixed-variant": "#003ea8", "error": "#ba1a1a", "on-background": "#131b2e", "on-secondary-fixed": "#0b1c30", "tertiary-fixed-dim": "#ffb596", "primary": "#004ac6" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "gutter": "0.75rem", "margin": "1rem", "space-xs": "0.25rem", "space-xl": "1rem", "space-md": "0.5rem", "space-sm": "0.375rem", "space-lg": "0.75rem" }, "fontFamily": { "body-sm": ["Be Vietnam Pro"], "headline-md": ["Be Vietnam Pro"], "body-md": ["Be Vietnam Pro"], "caption": ["Be Vietnam Pro"], "headline-lg": ["Be Vietnam Pro"], "label-md": ["Be Vietnam Pro"], "label-sm": ["Be Vietnam Pro"], "body-lg": ["Be Vietnam Pro"], "headline-xl": ["Be Vietnam Pro"] }, "fontSize": { "body-sm": ["0.8125rem", { "lineHeight": "1.125rem", "fontWeight": "400" }], "headline-md": ["1.125rem", { "lineHeight": "1.5rem", "letterSpacing": "-0.015em", "fontWeight": "600" }], "body-md": ["0.875rem", { "lineHeight": "1.25rem", "fontWeight": "400" }], "caption": ["0.6875rem", { "lineHeight": "0.875rem", "fontWeight": "400" }], "headline-lg": ["1.25rem", { "lineHeight": "1.75rem", "letterSpacing": "-0.02em", "fontWeight": "600" }], "label-md": ["0.8125rem", { "lineHeight": "1rem", "letterSpacing": "0.01em", "fontWeight": "500" }], "label-sm": ["0.75rem", { "lineHeight": "0.875rem", "letterSpacing": "0.02em", "fontWeight": "500" }], "body-lg": ["0.9375rem", { "lineHeight": "1.375rem", "fontWeight": "400" }], "headline-xl": ["1.75rem", { "lineHeight": "2.25rem", "letterSpacing": "-0.025em", "fontWeight": "700" }] } } } };</script></head><body class="min-h-screen flex flex-col bg-background font-body-md text-body-md text-on-surface auth-pattern-bg"><header class="fixed top-0 left-0 right-0 z-50 bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 w-full px-gutter flex items-center justify-between"><div class="flex items-center gap-space-md"><div class="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center text-on-primary-container shadow-sm"><span class="material-symbols-outlined text-[18px]">layers</span></div><div class="flex items-center gap-space-xs"><span class="font-headline-md text-headline-md tracking-tight text-on-surface">FB POST PRO</span><span class="px-space-xs py-[2px] rounded-lg bg-secondary-container text-on-secondary-container font-label-sm text-label-sm">v1.2.4</span></div><div class="hidden md:flex items-center gap-space-xs ml-space-md pl-space-md"><span class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span><span class="font-label-sm text-label-sm text-secondary">Hệ thống hoạt động 99.9%</span></div></div><nav class="flex items-center gap-space-xl" data-active-classes="text-primary font-label-md"><a aria-current="page" class="transition-colors text-primary font-label-md" data-path="login" href="#">Đăng nhập</a><a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="register" href="#">Đăng ký</a><a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors hidden sm:inline-block" data-path="help" href="#">Hỗ trợ</a></nav><div class="flex items-center gap-space-md"><button class="flex items-center gap-space-xs px-space-md py-space-xs rounded-lg bg-surface-container-low text-secondary hover:bg-surface-container hover:text-on-surface transition-colors font-label-sm text-label-sm" type="button"><span class="material-symbols-outlined text-[16px]">language</span><span>VIE</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 w-full pt-16 flex flex-col items-center justify-center py-space-xl px-gutter"><div class="w-full max-w-[440px] my-auto"><div class="flex flex-col w-full items-center">
+<!-- Interactive Tab Switcher Navigation Bar (Contract Testing Hub) -->
+<div class="w-full max-w-[420px] mb-space-lg flex items-center justify-between p-space-xs bg-surface-container rounded-full shadow-sm">
+<button class="flex-1 py-space-xs px-space-sm rounded-full font-label-md text-label-md transition-all duration-150 flex items-center justify-center gap-space-xs bg-surface-container-lowest text-primary shadow-sm font-semibold" id="tab-btn-login" onclick="switchAuthTab('login')" type="button">
+<span class="material-symbols-outlined text-[16px]">login</span>
+<span>Đăng nhập</span>
+</button>
+<button class="flex-1 py-space-xs px-space-sm rounded-full font-label-md text-label-md transition-all duration-150 flex items-center justify-center gap-space-xs text-secondary hover:text-on-surface" id="tab-btn-register" onclick="switchAuthTab('register')" type="button">
+<span class="material-symbols-outlined text-[16px]">person_add</span>
+<span>Đăng ký</span>
+</button>
+<button class="flex-1 py-space-xs px-space-sm rounded-full font-label-md text-label-md transition-all duration-150 flex items-center justify-center gap-space-xs text-secondary hover:text-on-surface" id="tab-btn-forgot" onclick="switchAuthTab('forgot')" type="button">
+<span class="material-symbols-outlined text-[16px]">key</span>
+<span>Khôi phục</span>
+</button>
+</div>
+<!-- Main Card Container -->
+<div class="w-full max-w-[420px] bg-surface-container-lowest rounded-full p-space-xl md:p-space-xl shadow-sm relative overflow-hidden transition-all duration-200">
+<!-- Top Branding Anchor -->
+<div class="flex flex-col items-center text-center mb-space-xl">
+<div class="w-12 h-12 rounded-xl bg-primary-container/10 flex items-center justify-center text-primary mb-space-sm shadow-sm">
+<span class="material-symbols-outlined text-[26px]">send</span>
+</div>
+<div class="inline-flex items-center gap-space-xs mb-space-xs">
+<span class="font-headline-md text-headline-md tracking-tight text-on-surface">FB POST PRO</span>
+<span class="px-space-xs py-[2px] rounded-lg bg-surface-container-high text-on-surface-variant font-caption text-caption uppercase tracking-wider font-semibold">Bản chuẩn v1.0</span>
+</div>
+<p class="font-body-sm text-body-sm text-secondary" id="hub-subtitle">Hệ sinh thái phân phối nội dung Facebook tự động hóa</p>
+</div>
+<!-- ==================== TAB 1: LOGIN (/login) ==================== -->
+<div class="flex flex-col" id="view-login">
+<div class="mb-space-lg text-left">
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Đăng nhập</h1>
+<p class="font-body-sm text-body-sm text-secondary mt-[2px]">Chào mừng bạn đến với FB POST PRO</p>
+</div>
+<!-- Live Mock Banner Switcher for Contract Testing -->
+<div class="mb-space-lg flex flex-col gap-space-xs">
+<!-- Error State Alert (Sample Contract Display) -->
+<div class="hidden flex items-start gap-space-sm p-space-sm rounded-lg bg-error-container text-on-error-container" id="login-error-banner">
+<span class="material-symbols-outlined text-[18px] text-error shrink-0">error</span>
+<div class="flex-1">
+<p class="font-label-sm text-label-sm font-semibold text-error">Đăng nhập không thành công</p>
+<p class="font-caption text-caption text-error" id="login-error-msg">Email hoặc mật khẩu không chính xác.</p>
+</div>
+<button class="text-error hover:opacity-75" onclick="hideLoginError()" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+<div class="flex items-center justify-end gap-space-sm">
+<span class="font-caption text-caption text-secondary">Mô phỏng lỗi:</span>
+<button class="font-caption text-caption text-error hover:underline" onclick="triggerLoginError('Email hoặc mật khẩu không chính xác.')" type="button">Sai pass</button>
+<span class="font-caption text-caption text-outline-variant">•</span>
+<button class="font-caption text-caption text-error hover:underline" onclick="triggerLoginError('Tài khoản đã bị khóa do vi phạm chính sách hoạt động.')" type="button">Khóa tài khoản</button>
+<span class="font-caption text-caption text-outline-variant">•</span>
+<button class="font-caption text-caption text-error hover:underline" onclick="triggerLoginError('Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email xác thực.')" type="button">Chưa xác minh</button>
+</div>
+</div>
+<!-- Login Form (POST /api/auth/login) -->
+<form class="flex flex-col gap-space-lg" id="form-login" onsubmit="handleLoginSubmit(event)">
+<!-- Field: email -->
+<div class="flex flex-col gap-space-xs text-left">
+<label class="font-label-md text-label-md text-on-surface" for="login-email">Email</label>
+<div class="relative flex items-center">
+<input class="w-full h-8 px-space-md bg-surface-container-lowest text-on-surface placeholder:text-secondary font-body-md text-body-md rounded-lg shadow-sm focus:outline-none focus:bg-surface-container-low transition-colors" id="login-email" name="email" placeholder="name@company.com" required="" type="email"/>
+</div>
+</div>
+<!-- Field: password -->
+<div class="flex flex-col gap-space-xs text-left">
+<div class="flex items-center justify-between">
+<label class="font-label-md text-label-md text-on-surface" for="login-password">Mật khẩu</label>
+<button class="font-label-sm text-label-sm text-primary hover:underline transition-colors" onclick="switchAuthTab('forgot')" type="button">Quên mật khẩu?</button>
+</div>
+<div class="relative flex items-center">
+<input class="w-full h-8 pl-space-md pr-8 bg-surface-container-lowest text-on-surface placeholder:text-secondary font-body-md text-body-md rounded-lg shadow-sm focus:outline-none focus:bg-surface-container-low transition-colors" id="login-password" name="password" placeholder="••••••••" required="" type="password"/>
+<button class="absolute right-space-xs p-1 text-secondary hover:text-on-surface transition-colors" onclick="togglePasswordVisibility('login-password', 'login-pwd-icon')" type="button">
+<span class="material-symbols-outlined text-[16px]" id="login-pwd-icon">visibility</span>
+</button>
+</div>
+</div>
+<!-- Remember Me Checkbox -->
+<div class="flex items-center gap-space-sm text-left">
+<input class="w-4 h-4 rounded-lg bg-surface-container-lowest text-primary focus:ring-0 focus:ring-offset-0 cursor-pointer" id="login-remember" type="checkbox"/>
+<label class="font-body-sm text-body-sm text-secondary cursor-pointer select-none" for="login-remember">Ghi nhớ đăng nhập trên thiết bị này</label>
+</div>
+<!-- Primary Action Button -->
+<button class="w-full h-8 rounded-lg bg-primary-container text-on-primary-container font-label-md text-label-md flex items-center justify-center gap-space-xs shadow-sm hover:opacity-95 active:scale-[0.99] transition-all" id="btn-submit-login" type="submit">
+<span class="material-symbols-outlined text-[16px]">login</span>
+<span>Đăng nhập</span>
+</button>
+</form>
+<!-- Switch to Register Link -->
+<div class="mt-space-xl pt-space-md text-center">
+<p class="font-body-sm text-body-sm text-secondary">
+          Chưa có tài khoản? 
+          <button class="font-label-md text-label-md text-primary font-semibold hover:underline" onclick="switchAuthTab('register')" type="button">Đăng ký ngay</button>
+</p>
+</div>
+</div>
+<!-- ==================== TAB 2: REGISTER (/register) ==================== -->
+<div class="hidden flex flex-col" id="view-register">
+<div class="mb-space-lg text-left">
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Đăng ký tài khoản mới</h1>
+<p class="font-body-sm text-body-sm text-secondary mt-[2px]">Bắt đầu tối ưu hóa hiệu suất đăng bài Facebook ngay hôm nay</p>
+</div>
+<!-- Registration Success Card (Post Submission Notice) -->
+<div class="hidden mb-space-lg p-space-md rounded-xl bg-surface-container-high text-on-surface" id="register-success-card">
+<div class="flex items-start gap-space-sm">
+<div class="w-6 h-6 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[14px]">mark_email_read</span>
+</div>
+<div class="flex-1 text-left">
+<h3 class="font-label-md text-label-md font-semibold text-primary">Tạo tài khoản thành công!</h3>
+<p class="font-body-sm text-body-sm text-secondary mt-space-xs">
+              Vui lòng kiểm tra email <span class="font-semibold text-on-surface" id="register-registered-email">minh.anh@example.com</span> để xác minh tài khoản trước khi đăng nhập.
+            </p>
+<button class="mt-space-sm font-label-sm text-label-sm text-primary font-semibold hover:underline flex items-center gap-space-xs" onclick="switchAuthTab('login')" type="button">
+<span class="material-symbols-outlined text-[14px]">arrow_back</span>
+<span>Đến trang Đăng nhập</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Registration Form (Strictly contract-specified fields only) -->
+<form class="flex flex-col gap-space-md" id="form-register" onsubmit="handleRegisterSubmit(event)">
+<!-- Field 1: display_name -->
+<div class="flex flex-col gap-space-xs text-left">
+<label class="font-label-md text-label-md text-on-surface" for="reg-display-name">Họ và tên</label>
+<input class="w-full h-8 px-space-md bg-surface-container-lowest text-on-surface placeholder:text-secondary font-body-md text-body-md rounded-lg shadow-sm focus:outline-none focus:bg-surface-container-low transition-colors" id="reg-display-name" name="display_name" placeholder="Nguyễn Minh Anh" required="" type="text"/>
+</div>
+<!-- Field 2: email -->
+<div class="flex flex-col gap-space-xs text-left">
+<label class="font-label-md text-label-md text-on-surface" for="reg-email">Email</label>
+<input class="w-full h-8 px-space-md bg-surface-container-lowest text-on-surface placeholder:text-secondary font-body-md text-body-md rounded-lg shadow-sm focus:outline-none focus:bg-surface-container-low transition-colors" id="reg-email" name="email" placeholder="minh.anh@example.com" required="" type="email"/>
+</div>
+<!-- Field 3: password -->
+<div class="flex flex-col gap-space-xs text-left">
+<label class="font-label-md text-label-md text-on-surface" for="reg-password">Mật khẩu</label>
+<div class="relative flex items-center">
+<input class="w-full h-8 pl-space-md pr-8 bg-surface-container-lowest text-on-surface placeholder:text-secondary font-body-md text-body-md rounded-lg shadow-sm focus:outline-none focus:bg-surface-container-low transition-colors" id="reg-password" name="password" oninput="evaluatePasswordStrength(this.value)" placeholder="Tối thiểu 8 ký tự" required="" type="password"/>
+<button class="absolute right-space-xs p-1 text-secondary hover:text-on-surface transition-colors" onclick="togglePasswordVisibility('reg-password', 'reg-pwd-icon')" type="button">
+<span class="material-symbols-outlined text-[16px]" id="reg-pwd-icon">visibility</span>
+</button>
+</div>
+<!-- Password Strength Indicator -->
+<div class="mt-space-xs flex flex-col gap-1">
+<div class="flex items-center justify-between font-caption text-caption text-secondary">
+<span>Độ bảo mật mật khẩu</span>
+<span class="font-semibold text-secondary" id="pwd-strength-label">Chưa nhập</span>
+</div>
+<div class="w-full h-1 bg-surface-container-high rounded-full overflow-hidden flex gap-1">
+<div class="h-full w-1/3 bg-transparent transition-colors duration-200" id="bar-seg-1"></div>
+<div class="h-full w-1/3 bg-transparent transition-colors duration-200" id="bar-seg-2"></div>
+<div class="h-full w-1/3 bg-transparent transition-colors duration-200" id="bar-seg-3"></div>
+</div>
+</div>
+</div>
+<!-- Field 4: confirm_password (FORM ONLY) -->
+<div class="flex flex-col gap-space-xs text-left">
+<label class="font-label-md text-label-md text-on-surface" for="reg-confirm-password">Xác nhận mật khẩu</label>
+<div class="relative flex items-center">
+<input class="w-full h-8 pl-space-md pr-8 bg-surface-container-lowest text-on-surface placeholder:text-secondary font-body-md text-body-md rounded-lg shadow-sm focus:outline-none focus:bg-surface-container-low transition-colors" id="reg-confirm-password" name="confirm_password" placeholder="Nhập lại mật khẩu" required="" type="password"/>
+<button class="absolute right-space-xs p-1 text-secondary hover:text-on-surface transition-colors" onclick="togglePasswordVisibility('reg-confirm-password', 'reg-confirm-icon')" type="button">
+<span class="material-symbols-outlined text-[16px]" id="reg-confirm-icon">visibility</span>
+</button>
+</div>
+</div>
+<!-- Terms Agreement Checkbox -->
+<div class="flex items-start gap-space-sm text-left mt-space-xs">
+<input class="w-4 h-4 mt-0.5 rounded-lg bg-surface-container-lowest text-primary focus:ring-0 focus:ring-offset-0 cursor-pointer" id="reg-terms" required="" type="checkbox"/>
+<label class="font-caption text-caption text-secondary cursor-pointer select-none leading-relaxed" for="reg-terms">
+            Tôi đồng ý với <a class="text-primary hover:underline" href="#">Điều khoản dịch vụ</a> và <a class="text-primary hover:underline" href="#">Chính sách bảo mật</a> của FB POST PRO.
+          </label>
+</div>
+<!-- Primary Action Button -->
+<button class="w-full h-8 mt-space-sm rounded-lg bg-primary-container text-on-primary-container font-label-md text-label-md flex items-center justify-center gap-space-xs shadow-sm hover:opacity-95 active:scale-[0.99] transition-all" id="btn-submit-register" type="submit">
+<span class="material-symbols-outlined text-[16px]">person_add</span>
+<span>Tạo tài khoản</span>
+</button>
+</form>
+<!-- Back to Login -->
+<div class="mt-space-lg pt-space-md text-center">
+<p class="font-body-sm text-body-sm text-secondary">
+          Đã có tài khoản? 
+          <button class="font-label-md text-label-md text-primary font-semibold hover:underline" onclick="switchAuthTab('login')" type="button">Đăng nhập</button>
+</p>
+</div>
+</div>
+<!-- ==================== TAB 3: FORGOT PASSWORD (/forgot-password) ==================== -->
+<div class="hidden flex flex-col" id="view-forgot">
+<div class="mb-space-lg text-left">
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Khôi phục mật khẩu</h1>
+<p class="font-body-sm text-body-sm text-secondary mt-[2px]">Nhập email đã đăng ký để nhận liên kết đặt lại mật khẩu</p>
+</div>
+<!-- Contract-Compliant Security Notice Banner -->
+<div class="hidden mb-space-lg p-space-md rounded-xl bg-surface-container-high text-on-surface text-left" id="forgot-feedback-banner">
+<div class="flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-[18px] text-primary shrink-0">mail</span>
+<div class="flex-1">
+<p class="font-label-md text-label-md font-semibold text-on-surface">Kiểm tra hộp thư của bạn</p>
+<p class="font-caption text-caption text-secondary mt-space-xs">
+              Nếu email tồn tại trong hệ thống, chúng tôi đã gửi đường dẫn đặt lại mật khẩu trong hộp thư. Vì lý do bảo mật, chúng tôi không tiết lộ trạng thái tài khoản.
+            </p>
+</div>
+</div>
+</div>
+<!-- Forgot Password Form (POST /api/auth/forgot-password) -->
+<form class="flex flex-col gap-space-lg" id="form-forgot" onsubmit="handleForgotSubmit(event)">
+<!-- Single Field: email -->
+<div class="flex flex-col gap-space-xs text-left">
+<label class="font-label-md text-label-md text-on-surface" for="forgot-email">Email tài khoản</label>
+<input class="w-full h-8 px-space-md bg-surface-container-lowest text-on-surface placeholder:text-secondary font-body-md text-body-md rounded-lg shadow-sm focus:outline-none focus:bg-surface-container-low transition-colors" id="forgot-email" name="email" placeholder="name@company.com" required="" type="email"/>
+</div>
+<button class="w-full h-8 rounded-lg bg-primary-container text-on-primary-container font-label-md text-label-md flex items-center justify-center gap-space-xs shadow-sm hover:opacity-95 active:scale-[0.99] transition-all" id="btn-submit-forgot" type="submit">
+<span class="material-symbols-outlined text-[16px]">send</span>
+<span>Gửi hướng dẫn đặt lại mật khẩu</span>
+</button>
+</form>
+<!-- Return Navigation -->
+<div class="mt-space-xl pt-space-md text-center">
+<button class="inline-flex items-center gap-space-xs font-label-md text-label-md text-secondary hover:text-on-surface transition-colors" onclick="switchAuthTab('login')" type="button">
+<span class="material-symbols-outlined text-[16px]">arrow_back</span>
+<span>Quay lại đăng nhập</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Contract Section 10.5 Preview Helper Action Trigger -->
+<div class="mt-space-lg flex items-center gap-space-sm text-secondary font-caption text-caption">
+<span>Tiện ích kiểm thử Contract 10.5:</span>
+<button class="px-space-sm py-space-xs rounded-lg bg-surface-container-lowest hover:bg-surface-container text-primary font-semibold transition-colors shadow-sm inline-flex items-center gap-1" onclick="toggleChangePasswordModal(true)" type="button">
+<span class="material-symbols-outlined text-[14px]">lock_reset</span>
+<span>Xem trước Modal Đổi mật khẩu (/change-password)</span>
+</button>
+</div>
+<!-- ==================== MODAL: CHANGE PASSWORD (Section 10.5) ==================== -->
+<div class="hidden fixed inset-0 z-50 flex items-center justify-center p-gutter bg-on-surface/40 backdrop-blur-sm transition-opacity" id="change-password-modal">
+<div class="w-full max-w-[400px] bg-surface-container-lowest rounded-full p-space-xl shadow-xl flex flex-col gap-space-lg relative">
+<!-- Modal Header -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-7 h-7 rounded-lg bg-surface-container-high flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[16px]">lock_reset</span>
+</div>
+<div>
+<h3 class="font-label-md text-label-md font-semibold text-on-surface">Đổi mật khẩu</h3>
+<p class="font-caption text-caption text-secondary">Cập nhật thông tin đăng nhập định kỳ</p>
+</div>
+</div>
+<button class="p-1 rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container transition-colors" onclick="toggleChangePasswordModal(false)" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<!-- Modal Body (Contract: current_password, new_password, confirm_password. NO password_hash) -->
+<form class="flex flex-col gap-space-md text-left" onsubmit="handleChangePasswordSubmit(event)">
+<!-- Field 1: Mật khẩu hiện tại -->
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-label-md text-on-surface" for="chg-current-pwd">Mật khẩu hiện tại</label>
+<div class="relative flex items-center">
+<input class="w-full h-8 pl-space-md pr-8 bg-surface-container-lowest text-on-surface placeholder:text-secondary font-body-md text-body-md rounded-lg shadow-sm focus:outline-none focus:bg-surface-container-low transition-colors" id="chg-current-pwd" name="current_password" placeholder="••••••••" required="" type="password"/>
+<button class="absolute right-space-xs p-1 text-secondary hover:text-on-surface" onclick="togglePasswordVisibility('chg-current-pwd', 'chg-cur-icon')" type="button">
+<span class="material-symbols-outlined text-[16px]" id="chg-cur-icon">visibility</span>
+</button>
+</div>
+</div>
+<!-- Field 2: Mật khẩu mới -->
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-label-md text-on-surface" for="chg-new-pwd">Mật khẩu mới</label>
+<div class="relative flex items-center">
+<input class="w-full h-8 pl-space-md pr-8 bg-surface-container-lowest text-on-surface placeholder:text-secondary font-body-md text-body-md rounded-lg shadow-sm focus:outline-none focus:bg-surface-container-low transition-colors" id="chg-new-pwd" name="new_password" placeholder="Tối thiểu 8 ký tự" required="" type="password"/>
+<button class="absolute right-space-xs p-1 text-secondary hover:text-on-surface" onclick="togglePasswordVisibility('chg-new-pwd', 'chg-new-icon')" type="button">
+<span class="material-symbols-outlined text-[16px]" id="chg-new-icon">visibility</span>
+</button>
+</div>
+</div>
+<!-- Field 3: Xác nhận mật khẩu mới -->
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-label-md text-on-surface" for="chg-confirm-new-pwd">Xác nhận mật khẩu mới</label>
+<div class="relative flex items-center">
+<input class="w-full h-8 pl-space-md pr-8 bg-surface-container-lowest text-on-surface placeholder:text-secondary font-body-md text-body-md rounded-lg shadow-sm focus:outline-none focus:bg-surface-container-low transition-colors" id="chg-confirm-new-pwd" name="confirm_new_password" placeholder="Nhập lại mật khẩu mới" required="" type="password"/>
+<button class="absolute right-space-xs p-1 text-secondary hover:text-on-surface" onclick="togglePasswordVisibility('chg-confirm-new-pwd', 'chg-conf-icon')" type="button">
+<span class="material-symbols-outlined text-[16px]" id="chg-conf-icon">visibility</span>
+</button>
+</div>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container font-caption text-caption text-secondary flex items-start gap-space-xs">
+<span class="material-symbols-outlined text-[16px] text-primary shrink-0">shield</span>
+<span>Tuyệt đối bảo mật: Mật khẩu được mã hóa an toàn trên đường truyền và máy chủ.</span>
+</div>
+<!-- Actions -->
+<div class="flex items-center justify-end gap-space-sm mt-space-xs">
+<button class="h-8 px-space-md rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors" onclick="toggleChangePasswordModal(false)" type="button">
+            Hủy
+          </button>
+<button class="h-8 px-space-md rounded-lg bg-primary-container text-on-primary-container font-label-md text-label-md flex items-center gap-space-xs shadow-sm hover:opacity-95 transition-all" type="submit">
+<span class="material-symbols-outlined text-[16px]">check</span>
+<span>Đổi mật khẩu</span>
+</button>
+</div>
+</form>
+</div>
+</div>
+</div>
+<script>
+  function switchAuthTab(tab) {
+    const tabs = ['login', 'register', 'forgot'];
+    tabs.forEach(t => {
+      const view = document.getElementById('view-' + t);
+      const btn = document.getElementById('tab-btn-' + t);
+      if (t === tab) {
+        view.classList.remove('hidden');
+        btn.className = 'flex-1 py-space-xs px-space-sm rounded-full font-label-md text-label-md transition-all duration-150 flex items-center justify-center gap-space-xs bg-surface-container-lowest text-primary shadow-sm font-semibold';
+      } else {
+        view.classList.add('hidden');
+        btn.className = 'flex-1 py-space-xs px-space-sm rounded-full font-label-md text-label-md transition-all duration-150 flex items-center justify-center gap-space-xs text-secondary hover:text-on-surface';
+      }
+    });
+
+    const sub = document.getElementById('hub-subtitle');
+    if (tab === 'login') sub.textContent = 'Hệ sinh thái phân phối nội dung Facebook tự động hóa';
+    if (tab === 'register') sub.textContent = 'Nền tảng xuất bản đa tài khoản tốc độ cao';
+    if (tab === 'forgot') sub.textContent = 'Khôi phục quyền truy cập bảng điều khiển FB POST PRO';
+  }
+
+  function togglePasswordVisibility(inputId, iconId) {
+    const input = document.getElementById(inputId);
+    const icon = document.getElementById(iconId);
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.textContent = 'visibility_off';
+    } else {
+      input.type = 'password';
+      icon.textContent = 'visibility';
+    }
+  }
+
+  function triggerLoginError(message) {
+    const banner = document.getElementById('login-error-banner');
+    const msg = document.getElementById('login-error-msg');
+    msg.textContent = message;
+    banner.classList.remove('hidden');
+  }
+
+  function hideLoginError() {
+    document.getElementById('login-error-banner').classList.add('hidden');
+  }
+
+  function evaluatePasswordStrength(val) {
+    const seg1 = document.getElementById('bar-seg-1');
+    const seg2 = document.getElementById('bar-seg-2');
+    const seg3 = document.getElementById('bar-seg-3');
+    const label = document.getElementById('pwd-strength-label');
+
+    seg1.className = 'h-full w-1/3 bg-transparent transition-colors duration-200';
+    seg2.className = 'h-full w-1/3 bg-transparent transition-colors duration-200';
+    seg3.className = 'h-full w-1/3 bg-transparent transition-colors duration-200';
+
+    if (!val || val.length === 0) {
+      label.textContent = 'Chưa nhập';
+      label.className = 'font-semibold text-secondary';
+      return;
+    }
+
+    if (val.length < 6) {
+      seg1.classList.remove('bg-transparent');
+      seg1.classList.add('bg-error');
+      label.textContent = 'Yếu';
+      label.className = 'font-semibold text-error';
+    } else if (val.length < 10) {
+      seg1.classList.remove('bg-transparent');
+      seg1.classList.add('bg-tertiary-container');
+      seg2.classList.remove('bg-transparent');
+      seg2.classList.add('bg-tertiary-container');
+      label.textContent = 'Trung bình';
+      label.className = 'font-semibold text-tertiary-container';
+    } else {
+      seg1.classList.remove('bg-transparent');
+      seg1.classList.add('bg-primary-container');
+      seg2.classList.remove('bg-transparent');
+      seg2.classList.add('bg-primary-container');
+      seg3.classList.remove('bg-transparent');
+      seg3.classList.add('bg-primary-container');
+      label.textContent = 'Rất mạnh';
+      label.className = 'font-semibold text-primary';
+    }
+  }
+
+  function handleLoginSubmit(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-submit-login');
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">refresh</span><span>Đang xác thực...</span>';
+    setTimeout(() => {
+      btn.innerHTML = origHtml;
+      btn.disabled = false;
+      // In actual deployment, transitions to /post
+      alert('Đăng nhập thành công! Chuyển hướng tới /post');
+    }, 700);
+  }
+
+  function handleRegisterSubmit(e) {
+    e.preventDefault();
+    const pwd = document.getElementById('reg-password').value;
+    const conf = document.getElementById('reg-confirm-password').value;
+    const email = document.getElementById('reg-email').value;
+
+    if (pwd !== conf) {
+      alert('Mật khẩu và xác nhận mật khẩu không khớp!');
+      return;
+    }
+
+    const btn = document.getElementById('btn-submit-register');
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">refresh</span><span>Đang tạo tài khoản...</span>';
+
+    setTimeout(() => {
+      btn.innerHTML = origHtml;
+      btn.disabled = false;
+      document.getElementById('register-registered-email').textContent = email;
+      document.getElementById('register-success-card').classList.remove('hidden');
+      document.getElementById('form-register').reset();
+      evaluatePasswordStrength('');
+    }, 800);
+  }
+
+  function handleForgotSubmit(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-submit-forgot');
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">refresh</span><span>Đang xử lý yêu cầu...</span>';
+
+    setTimeout(() => {
+      btn.innerHTML = origHtml;
+      btn.disabled = false;
+      document.getElementById('forgot-feedback-banner').classList.remove('hidden');
+      document.getElementById('form-forgot').reset();
+    }, 700);
+  }
+
+  function toggleChangePasswordModal(show) {
+    const modal = document.getElementById('change-password-modal');
+    if (show) {
+      modal.classList.remove('hidden');
+    } else {
+      modal.classList.add('hidden');
+    }
+  }
+
+  function handleChangePasswordSubmit(e) {
+    e.preventDefault();
+    alert('Yêu cầu đổi mật khẩu đã được xử lý an toàn theo Contract Section 10.5!');
+    toggleChangePasswordModal(false);
+  }
+</script></div></main><footer class="w-full bg-surface-container-lowest/80 backdrop-blur-md shadow-[0_-1px_6px_rgba(0,0,0,0.02)] py-space-lg"><div class="w-full px-gutter flex flex-col md:flex-row items-center justify-between gap-space-md font-caption text-caption text-secondary"><div class="flex items-center gap-space-sm"><span>© 2024 FB POST PRO. Nền tảng tự động hóa đăng bài Facebook chuyên nghiệp.</span></div><div class="flex flex-wrap items-center justify-center gap-space-lg"><div class="flex items-center gap-space-xs text-secondary"><span class="material-symbols-outlined text-[14px] text-primary">lock</span><span>Mã hóa SSL 256-bit</span></div><div class="flex items-center gap-space-xs text-secondary"><span class="material-symbols-outlined text-[14px] text-primary">verified_user</span><span>Cam kết bảo mật dữ liệu</span></div><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[14px]">support_agent</span><a class="text-primary hover:underline" href="#">Hotline 24/7</a></div></div></div></footer></body></html>

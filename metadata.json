@@ -1,0 +1,6 @@
+{
+  "name": "FB POST PRO",
+  "description": "Hệ thống quản lý và tự động hóa đăng bài Facebook chuyên nghiệp đa tài khoản, lên lịch thông minh và giám sát Extension.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

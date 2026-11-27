@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "surface-container-low": "#f2f3ff",
+          "inverse-surface": "#283044",
+          "surface-container-high": "#e2e7ff",
+          "primary-fixed": "#dbe1ff",
+          "on-surface": "#131b2e",
+          "on-secondary": "#ffffff",
+          "surface-tint": "#0053db",
+          "surface": "#faf8ff",
+          "secondary-fixed-dim": "#b7c8e1",
+          "on-primary-fixed": "#00174b",
+          "surface-bright": "#faf8ff",
+          "surface-container": "#eaedff",
+          "primary-fixed-dim": "#b4c5ff",
+          "on-error": "#ffffff",
+          "on-tertiary-fixed": "#360f00",
+          "inverse-on-surface": "#eef0ff",
+          "surface-container-highest": "#dae2fd",
+          "error-container": "#ffdad6",
+          "tertiary-container": "#bc4800",
+          "surface-dim": "#d2d9f4",
+          "outline": "#737686",
+          "on-surface-variant": "#434655",
+          "on-secondary-fixed": "#0b1c30",
+          "on-tertiary": "#ffffff",
+          "on-tertiary-fixed-variant": "#7d2d00",
+          "tertiary-fixed": "#ffdbcd",
+          "secondary-container": "#d0e1fb",
+          "inverse-primary": "#b4c5ff",
+          "primary-container": "#2563eb",
+          "tertiary": "#943700",
+          "on-background": "#131b2e",
+          "surface-variant": "#dae2fd",
+          "background": "#faf8ff",
+          "on-primary-fixed-variant": "#003ea8",
+          "on-primary": "#ffffff",
+          "secondary-fixed": "#d3e4fe",
+          "outline-variant": "#c3c6d7",
+          "surface-container-lowest": "#ffffff",
+          "primary": "#004ac6",
+          "on-secondary-fixed-variant": "#38485d",
+          "tertiary-fixed-dim": "#ffb596",
+          "on-secondary-container": "#54647a",
+          "secondary": "#505f76",
+          "error": "#ba1a1a",
+          "on-tertiary-container": "#ffede6",
+          "on-error-container": "#93000a",
+          "on-primary-container": "#eeefff"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "space-lg": "0.75rem",
+          "space-sm": "0.375rem",
+          "space-md": "0.5rem",
+          "space-xs": "0.25rem",
+          "margin": "1rem",
+          "gutter": "0.75rem",
+          "space-xl": "1rem"
+        },
+        "fontFamily": {
+          "caption": [
+            "Be Vietnam Pro"
+          ],
+          "headline-lg": [
+            "Be Vietnam Pro"
+          ],
+          "headline-md": [
+            "Be Vietnam Pro"
+          ],
+          "label-md": [
+            "Be Vietnam Pro"
+          ],
+          "body-sm": [
+            "Be Vietnam Pro"
+          ],
+          "body-lg": [
+            "Be Vietnam Pro"
+          ],
+          "headline-xl": [
+            "Be Vietnam Pro"
+          ],
+          "label-sm": [
+            "Be Vietnam Pro"
+          ],
+          "body-md": [
+            "Be Vietnam Pro"
+          ]
+        },
+        "fontSize": {
+          "caption": [
+            "0.6875rem",
+            {
+              "lineHeight": "0.875rem",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-lg": [
+            "1.25rem",
+            {
+              "lineHeight": "1.75rem",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "600"
+            }
+          ],
+          "headline-md": [
+            "1.125rem",
+            {
+              "lineHeight": "1.5rem",
+              "letterSpacing": "-0.015em",
+              "fontWeight": "600"
+            }
+          ],
+          "label-md": [
+            "0.8125rem",
+            {
+              "lineHeight": "1rem",
+              "letterSpacing": "0.01em",
+              "fontWeight": "500"
+            }
+          ],
+          "body-sm": [
+            "0.8125rem",
+            {
+              "lineHeight": "1.125rem",
+              "fontWeight": "400"
+            }
+          ],
+          "body-lg": [
+            "0.9375rem",
+            {
+              "lineHeight": "1.375rem",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-xl": [
+            "1.75rem",
+            {
+              "lineHeight": "2.25rem",
+              "letterSpacing": "-0.025em",
+              "fontWeight": "700"
+            }
+          ],
+          "label-sm": [
+            "0.75rem",
+            {
+              "lineHeight": "0.875rem",
+              "letterSpacing": "0.02em",
+              "fontWeight": "500"
+            }
+          ],
+          "body-md": [
+            "0.875rem",
+            {
+              "lineHeight": "1.25rem",
+              "fontWeight": "400"
+            }
+          ]
+        }
+      },
+    },
+  }</script></head><body class="bg-surface text-on-surface font-body-md text-body-md antialiased selection:bg-primary-container selection:text-on-primary"><aside class="fixed left-0 top-0 h-full w-[72px] bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between py-space-md"><div class="flex flex-col items-center gap-space-lg"><div class="h-12 w-full flex items-center justify-center"><img alt="FB POST PRO Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/ALJJyrC8YcWag9WvkzQF1Du3RhZD1Au_70ACnNC-8BGhbDpm9hKzrLSRICGzV4ZmkmlDi0QnIYgbkeo8ANDAXXONM_tQiCqDAMwrKCsdEbXcsvSV8jRTObwthWw69i9NbIFvXqlpPRPTHsdKBCLNAQKff9h_hNPlsyFJX3CMmUiEVrPsGAo5HGkOrAhZCPMQCns6hlSFNb2ameuSQFyt713QrAGXdDdHJVea9-B7En4q_J5T"/></div><nav class="flex flex-col items-center gap-space-xs w-full px-space-xs" data-active-classes="bg-primary-container text-on-primary rounded-lg"><div class="relative group flex justify-center w-full"><a class="w-11 h-11 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[22px]">dashboard</span></a><div class="absolute left-full ml-space-xs top-1/2 -translate-y-1/2 hidden group-hover:flex items-center px-space-md py-space-xs bg-inverse-surface text-inverse-on-surface font-label-sm text-label-sm rounded shadow-[0_4px_12px_-2px_rgba(15,23,42,0.08)] whitespace-nowrap z-50 pointer-events-none">Tổng quan</div></div><div class="relative group flex justify-center w-full"><a class="w-11 h-11 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="post" href="#"><span class="material-symbols-outlined text-[22px]">edit_square</span></a><div class="absolute left-full ml-space-xs top-1/2 -translate-y-1/2 hidden group-hover:flex items-center px-space-md py-space-xs bg-inverse-surface text-inverse-on-surface font-label-sm text-label-sm rounded shadow-[0_4px_12px_-2px_rgba(15,23,42,0.08)] whitespace-nowrap z-50 pointer-events-none">Đăng bài Facebook</div></div><div class="relative group flex justify-center w-full"><a class="w-11 h-11 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="accounts" href="#"><span class="material-symbols-outlined text-[22px]">group</span></a><div class="absolute left-full ml-space-xs top-1/2 -translate-y-1/2 hidden group-hover:flex items-center px-space-md py-space-xs bg-inverse-surface text-inverse-on-surface font-label-sm text-label-sm rounded shadow-[0_4px_12px_-2px_rgba(15,23,42,0.08)] whitespace-nowrap z-50 pointer-events-none">Tài khoản Facebook</div></div></nav></div><div class="flex flex-col items-center gap-space-xs w-full px-space-xs"><div class="relative group flex justify-center w-full"><a class="w-11 h-11 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="pricing" href="#"><span class="material-symbols-outlined text-[22px]">account_balance_wallet</span></a><div class="absolute left-full ml-space-xs top-1/2 -translate-y-1/2 hidden group-hover:flex items-center px-space-md py-space-xs bg-inverse-surface text-inverse-on-surface font-label-sm text-label-sm rounded shadow-[0_4px_12px_-2px_rgba(15,23,42,0.08)] whitespace-nowrap z-50 pointer-events-none">Gói dịch vụ</div></div><button class="w-11 h-11 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" title="Mở rộng thanh công cụ" type="button"><span class="material-symbols-outlined text-[20px]">keyboard_double_arrow_right</span></button></div></aside><div class="pl-[72px]"><header class="fixed top-0 left-[72px] right-0 h-[60px] bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-space-xl"><div class="flex items-center gap-space-md"><span class="font-headline-md text-headline-md text-on-surface tracking-tight font-semibold">FB POST PRO</span><div class="h-4 w-[1px] bg-surface-container-highest"></div><span class="font-label-md text-label-md text-on-surface-variant font-medium">Facebook Posting Automation</span></div><div class="flex items-center gap-space-lg"><div class="inline-flex items-center gap-space-xs bg-surface-container-low px-space-md py-space-xs rounded-lg"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span class="font-label-sm text-label-sm text-on-surface font-medium">Đã kết nối</span><span class="font-caption text-caption text-on-surface-variant bg-surface-container px-space-xs rounded">v1.2.4</span></div><button class="h-8 px-space-lg bg-surface-container-low text-on-surface font-label-md text-label-md rounded-lg hover:bg-surface-container-high hover:text-on-surface transition-colors flex items-center gap-space-xs" type="button"><span class="material-symbols-outlined text-[16px]">extension</span><span>Cài đặt Extension</span></button><button class="h-8 px-space-lg bg-primary-container text-on-primary font-label-md text-label-md rounded-lg hover:bg-primary transition-colors flex items-center gap-space-xs font-medium" type="button"><span class="material-symbols-outlined text-[16px]">bolt</span><span>Mua gói</span></button><div class="h-6 w-[1px] bg-surface-container-highest"></div><div class="flex items-center gap-space-md pl-space-xs cursor-pointer group"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-1 ring-surface-container-highest" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDoPt2G-DdhuVSX23NxMldNzHQLvBXK1wtA3lygmb_hJb16EDKYH5JRR9JYpMPGln0xklIblxyRfEqPqYgboDI8SA3h3bffhPD-24kQ9R7UZ-eTqU1MljiSTG811g4dvtgpe7rxZNcMxqZB2_XCQIXeA5P6rDTTtk4GaTDvvah5d6EkmvL0ga_x60iszCTiMK2fxac7-B993d0rjfhBsnhAXjAvZ-oP_svzZpPworo"/><div class="flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface font-medium leading-tight">Nguyễn Minh Anh</span><span class="font-caption text-caption text-primary font-medium leading-none">Gói PRO</span></div><span class="material-symbols-outlined text-[18px] text-on-surface-variant group-hover:text-on-surface transition-colors">arrow_drop_down</span></div></div></header><main class="w-full pt-[60px] p-[20px] bg-surface min-h-screen"><div class="flex flex-col w-full">
+<!-- Top Command & Status Ribbon -->
+<div class="flex flex-wrap items-center justify-between gap-space-md mb-space-xl">
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-xs bg-surface-container-highest px-space-md py-space-xs rounded-lg">
+<span class="font-caption text-caption uppercase tracking-wider text-on-surface-variant font-medium">Mã màn hình:</span>
+<span class="font-label-sm text-label-sm font-semibold text-primary">POST-MODAL-SYSTEM</span>
+</div>
+<div class="h-4 w-1 bg-surface-container-high rounded-full"></div>
+<div class="flex items-center gap-space-xs text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px] text-primary">layers</span>
+<span class="font-label-md text-label-md font-medium text-on-surface">Trung tâm hội thoại &amp; tác vụ tự động</span>
+<span class="font-caption text-caption px-space-xs py-0.5 rounded bg-surface-container text-on-secondary-container">POST-12 / POST-13 / POST-22</span>
+</div>
+</div>
+<!-- Modal View Switcher Navigation -->
+<div class="flex items-center gap-space-xs bg-surface-container-lowest p-space-xs rounded-xl shadow-sm">
+<button class="flex items-center gap-space-xs px-space-lg py-space-xs rounded-lg bg-primary-container text-on-primary font-label-md text-label-md font-medium transition-all shadow-sm" id="tab-btn-publish" onclick="switchModalView('modal-publish')">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+<span>Xác nhận bài đăng (POST-22)</span>
+<span class="font-caption text-caption px-1.5 py-0.5 rounded bg-on-primary/20 text-on-primary ml-1">3 tác vụ</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-lg py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container font-label-md text-label-md font-medium transition-all" id="tab-btn-addgroup" onclick="switchModalView('modal-addgroup')">
+<span class="material-symbols-outlined text-[18px]">group_add</span>
+<span>Thêm nhóm đơn lẻ (POST-12)</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-lg py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container font-label-md text-label-md font-medium transition-all" id="tab-btn-csv" onclick="switchModalView('modal-csv')">
+<span class="material-symbols-outlined text-[18px]">upload_file</span>
+<span>Nhập nhóm từ CSV (POST-13)</span>
+<span class="font-caption text-caption px-1.5 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed ml-1">22 hợp lệ</span>
+</button>
+</div>
+</div>
+<!-- WORKSPACE STAGING ENVIRONMENT -->
+<div class="relative w-full rounded-xl bg-surface-container-low p-space-md md:p-space-lg min-h-[760px] flex flex-col justify-start">
+<!-- SUBTLE BACKGROUND WORKSPACE SIMULATION -->
+<div class="absolute inset-0 p-space-xl pointer-events-none opacity-25 overflow-hidden select-none">
+<div class="grid grid-cols-12 gap-gutter mb-space-lg">
+<div class="col-span-8 bg-surface-container-lowest rounded-xl h-48 p-space-lg flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-headline-md text-headline-md text-on-surface">Bản thảo nội dung bài đăng #SLOT-01</span>
+<span class="font-label-sm text-label-sm text-primary">Sẵn sàng phân phối</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant line-clamp-2">Cho thuê căn hộ dịch vụ cao cấp 2 phòng ngủ tại Cầu Giấy, nội thất chuẩn châu Âu, ban công thoáng mát, view hồ điều hòa...</p>
+<div class="flex gap-space-md">
+<div class="w-16 h-12 bg-surface-container rounded-lg"></div>
+<div class="w-16 h-12 bg-surface-container rounded-lg"></div>
+</div>
+</div>
+<div class="col-span-4 bg-surface-container-lowest rounded-xl h-48 p-space-lg">
+<span class="font-label-md text-label-md text-on-surface">Danh sách 14 nhóm mục tiêu</span>
+</div>
+</div>
+<div class="w-full bg-surface-container-lowest rounded-xl h-96 p-space-lg"></div>
+</div>
+<!-- MODAL 1: POST-22 XÁC NHẬN BÀI ĐĂNG (PUBLISH CONFIRMATION & TASK MAPPING) -->
+<div class="relative z-10 w-full max-w-6xl mx-auto my-auto flex flex-col bg-surface-container-lowest rounded-xl shadow-xl overflow-hidden transition-all duration-300" id="modal-publish-view">
+<!-- Modal Header -->
+<div class="flex items-start justify-between px-space-xl py-space-lg bg-surface-container-lowest">
+<div class="flex items-start gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-primary-fixed flex items-center justify-center text-primary mt-0.5">
+<span class="material-symbols-outlined text-[24px]">task_alt</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-space-sm">
+<h2 class="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight">Xác nhận bài đăng</h2>
+<span class="font-caption text-caption px-space-xs py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-semibold uppercase">POST-22</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+              Kiểm tra kỹ nội dung và đích đăng trước khi tạo tác vụ. Mỗi dòng tương ứng với một <code class="px-1 py-0.5 rounded bg-surface-container font-mono text-[11px] text-on-surface">publishing_task_item</code>.
+            </p>
+</div>
+</div>
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors" title="Đóng cửa sổ">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<!-- Quick Metrics & Pipeline Health Banner -->
+<div class="px-space-xl py-space-sm bg-surface-container-low flex flex-wrap items-center justify-between gap-space-md">
+<div class="flex flex-wrap items-center gap-space-lg">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[18px]">verified_user</span>
+<span class="font-caption text-caption text-on-surface-variant">Tài khoản kết nối:</span>
+<span class="font-label-sm text-label-sm font-semibold text-on-surface">Nguyễn Minh Anh (Gói PRO)</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[18px]">donut_large</span>
+<span class="font-caption text-caption text-on-surface-variant">Hạn mức phiên đăng:</span>
+<span class="font-label-sm text-label-sm font-semibold text-on-surface">4 / 200 tác vụ/ngày</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[18px]">perm_media</span>
+<span class="font-caption text-caption text-on-surface-variant">Trạng thái Media:</span>
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm font-semibold text-primary">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></span> Sẵn sàng (READY)
+            </span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="font-caption text-caption text-on-surface-variant">Múi giờ thực thi:</span>
+<span class="font-label-sm text-label-sm text-on-surface font-medium bg-surface-container px-space-xs py-0.5 rounded">GMT+7 (Asia/Ho_Chi_Minh)</span>
+</div>
+</div>
+<!-- High-Density Task Mapping Table Container -->
+<div class="w-full overflow-x-auto">
+<table class="w-full text-left font-body-sm text-body-sm">
+<thead>
+<tr class="bg-surface-container text-on-surface-variant font-label-sm text-label-sm tracking-wide select-none">
+<th class="py-space-md px-space-lg w-12 text-center">STT</th>
+<th class="py-space-md px-space-md w-36">Bài viết</th>
+<th class="py-space-md px-space-md">Nội dung rút gọn</th>
+<th class="py-space-md px-space-md w-60">Đích đăng &amp; UID nhóm</th>
+<th class="py-space-md px-space-md w-40">Số ảnh / Media</th>
+<th class="py-space-md px-space-md w-36">Thời gian</th>
+<th class="py-space-md px-space-md w-36">Phương thức</th>
+<th class="py-space-md px-space-lg w-16 text-center">Thao tác</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-high bg-surface-container-lowest">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-space-md px-space-lg text-center font-label-sm text-label-sm text-on-surface-variant font-mono">01</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-semibold text-on-surface">Slot 1 - Bản nháp</span>
+<span class="font-caption text-caption text-on-surface-variant">BĐS Hà Nội Q3</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col max-w-sm">
+<p class="font-body-sm text-body-sm text-on-surface line-clamp-1">
+                    Cần cho thuê căn hộ 2 phòng ngủ tại Cầu Giấy, Hà Nội. Căn hộ đầy đủ nội thất tiện nghi...
+                  </p>
+<span class="font-caption text-caption text-outline">184 ký tự • 4 hashtag</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-medium text-on-surface line-clamp-1">Mua bán &amp; Cho thuê BĐS Cầu Giấy</span>
+<span class="font-caption text-caption font-mono text-outline">UID: 1049285720194</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-primary-fixed/50 text-on-primary-fixed font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[15px] text-primary">image</span>
+<span>2 ảnh (READY)</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<span class="font-label-sm text-label-sm font-semibold text-primary">Thực hiện ngay</span>
+</td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container text-on-secondary-container font-caption text-caption font-mono">
+                  MANUAL_GROUP
+                </span>
+</td>
+<td class="py-space-md px-space-lg text-center">
+<button class="w-7 h-7 rounded flex items-center justify-center text-outline hover:text-error hover:bg-error-container/40 transition-colors" title="Xóa tác vụ">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-space-md px-space-lg text-center font-label-sm text-label-sm text-on-surface-variant font-mono">02</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-semibold text-on-surface">Slot 1 - Bản nháp</span>
+<span class="font-caption text-caption text-on-surface-variant">BĐS Hà Nội Q3</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col max-w-sm">
+<p class="font-body-sm text-body-sm text-on-surface line-clamp-1">
+                    Cần cho thuê căn hộ 2 phòng ngủ tại Cầu Giấy, Hà Nội. Căn hộ đầy đủ nội thất tiện nghi...
+                  </p>
+<span class="font-caption text-caption text-outline">184 ký tự • 4 hashtag</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-medium text-on-surface line-clamp-1">Cộng đồng Chung Cư Hà Nội Giá Tốt</span>
+<span class="font-caption text-caption font-mono text-outline">UID: 984572019412</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-primary-fixed/50 text-on-primary-fixed font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[15px] text-primary">image</span>
+<span>2 ảnh (READY)</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono">14:30 GMT+7</span>
+</td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container text-on-secondary-container font-caption text-caption font-mono">
+                  MANUAL_GROUP
+                </span>
+</td>
+<td class="py-space-md px-space-lg text-center">
+<button class="w-7 h-7 rounded flex items-center justify-center text-outline hover:text-error hover:bg-error-container/40 transition-colors" title="Xóa tác vụ">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-space-md px-space-lg text-center font-label-sm text-label-sm text-on-surface-variant font-mono">03</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-semibold text-on-surface">Slot 1 - Bản nháp</span>
+<span class="font-caption text-caption text-on-surface-variant">BĐS Hà Nội Q3</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col max-w-sm">
+<p class="font-body-sm text-body-sm text-on-surface line-clamp-1">
+                    Cần cho thuê căn hộ 2 phòng ngủ tại Cầu Giấy, Hà Nội. Căn hộ đầy đủ nội thất tiện nghi...
+                  </p>
+<span class="font-caption text-caption text-outline">184 ký tự • 4 hashtag</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-medium text-on-surface line-clamp-1">Hội Cư Dân Vinhomes Smart City Tây Mỗ</span>
+<span class="font-caption text-caption font-mono text-outline">UID: 442019485720</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-primary-fixed/50 text-on-primary-fixed font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[15px] text-primary">image</span>
+<span>2 ảnh (READY)</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono">15:00 GMT+7</span>
+</td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container text-on-secondary-container font-caption text-caption font-mono">
+                  MANUAL_GROUP
+                </span>
+</td>
+<td class="py-space-md px-space-lg text-center">
+<button class="w-7 h-7 rounded flex items-center justify-center text-outline hover:text-error hover:bg-error-container/40 transition-colors" title="Xóa tác vụ">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Execution Warning / Safety Tips -->
+<div class="p-space-lg bg-surface-container-high/40 flex items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[20px]">info</span>
+<span class="font-body-sm text-body-sm text-on-surface">
+            Hệ thống tự động thêm độ trễ ngẫu nhiên từ <strong>45 - 90 giây</strong> giữa các nhóm để chống spam Facebook checkpoint.
+          </span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Extension V1.2.4 giám sát trực tiếp</span>
+</div>
+</div>
+<!-- Action Footer -->
+<div class="flex items-center justify-between px-space-xl py-space-md bg-surface-container-lowest">
+<button class="h-9 px-space-lg bg-surface-container-low text-on-surface hover:bg-surface-container font-label-md text-label-md font-medium rounded-lg transition-colors flex items-center gap-space-xs" type="button">
+<span class="material-symbols-outlined text-[18px]">arrow_back</span>
+<span>Quay lại chỉnh sửa</span>
+</button>
+<div class="flex items-center gap-space-md">
+<span class="font-caption text-caption text-on-surface-variant">Sẽ tạo chính xác <strong>3 bản ghi</strong> publishing_tasks</span>
+<button class="h-9 px-space-xl bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md font-semibold rounded-lg shadow-sm transition-all flex items-center gap-space-xs group" type="button">
+<span class="material-symbols-outlined text-[18px] group-hover:rotate-12 transition-transform">send</span>
+<span>Xác nhận tạo tác vụ (POST-23)</span>
+</button>
+</div>
+</div>
+</div>
+<!-- MODAL 2: POST-12 THÊM NHÓM FACEBOOK ĐƠN LẺ -->
+<div class="hidden relative z-10 w-full max-w-2xl mx-auto my-auto flex flex-col bg-surface-container-lowest rounded-xl shadow-xl overflow-hidden transition-all duration-300" id="modal-addgroup-view">
+<!-- Header -->
+<div class="flex items-start justify-between px-space-xl py-space-lg bg-surface-container-lowest">
+<div class="flex items-center gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-primary-fixed flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[24px]">group_add</span>
+</div>
+<div>
+<div class="flex items-center gap-space-xs">
+<h2 class="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight">Thêm nhóm Facebook</h2>
+<span class="font-caption text-caption px-space-xs py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-semibold uppercase">POST-12</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Lưu thông tin cộng đồng Facebook mới vào cơ sở dữ liệu định tuyến.</p>
+</div>
+</div>
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors" onclick="switchModalView('modal-publish')">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<!-- Form Body - Contract Schema Matching -->
+<form class="p-space-xl flex flex-col gap-space-lg bg-surface-container-lowest">
+<!-- Field: group_name -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex justify-between items-center">
+<label class="font-label-md text-label-md font-medium text-on-surface">
+              Tên nhóm <span class="text-error font-bold">*</span>
+</label>
+<span class="font-caption text-caption text-outline font-mono">groups.group_name</span>
+</div>
+<div class="relative">
+<input class="w-full h-9 px-space-md rounded-lg bg-surface text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all" placeholder="Ví dụ: Mua bán nhà đất Hà Nội" required="" type="text" value="Mua bán nhà đất Hà Nội &amp; Miền Bắc"/>
+</div>
+</div>
+<!-- Field: group_url -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex justify-between items-center">
+<label class="font-label-md text-label-md font-medium text-on-surface">
+              Đường dẫn nhóm (URL) <span class="text-error font-bold">*</span>
+</label>
+<span class="font-caption text-caption text-outline font-mono">groups.group_url</span>
+</div>
+<div class="relative">
+<input class="w-full h-9 px-space-md rounded-lg bg-surface text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all" placeholder="https://facebook.com/groups/ten-nhom" required="" type="url" value="https://facebook.com/groups/batdongsanhanoi"/>
+</div>
+</div>
+<!-- 2 Columns Grid: group_uid & member_count -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<!-- Field: group_uid -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex justify-between items-center">
+<label class="font-label-md text-label-md font-medium text-on-surface">UID nhóm</label>
+<span class="font-caption text-caption text-outline font-mono">groups.group_uid</span>
+</div>
+<div class="relative">
+<input class="w-full h-9 px-space-md rounded-lg bg-surface text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all font-mono" placeholder="Tự động trích xuất từ URL hoặc nhập số" type="text" value="1049285720194"/>
+</div>
+</div>
+<!-- Field: member_count -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex justify-between items-center">
+<label class="font-label-md text-label-md font-medium text-on-surface">Số thành viên</label>
+<span class="font-caption text-caption text-outline font-mono">groups.member_count</span>
+</div>
+<div class="relative">
+<input class="w-full h-9 px-space-md rounded-lg bg-surface text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all" placeholder="Ví dụ: 85420" type="number" value="85420"/>
+</div>
+</div>
+</div>
+<!-- 2 Columns Grid: requires_approval & collection_id -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<!-- Field: requires_approval -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex justify-between items-center">
+<label class="font-label-md text-label-md font-medium text-on-surface">Yêu cầu duyệt bài</label>
+<span class="font-caption text-caption text-outline font-mono">groups.requires_approval</span>
+</div>
+<select class="w-full h-9 px-space-md rounded-lg bg-surface text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all">
+<option value="unknown">Chưa rõ trạng thái</option>
+<option selected="" value="true">Có kiểm duyệt (Admin duyệt)</option>
+<option value="false">Không (Đăng trực tiếp tự do)</option>
+</select>
+</div>
+<!-- Field: group_collections.id -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex justify-between items-center">
+<label class="font-label-md text-label-md font-medium text-on-surface">Bộ sưu tập</label>
+<span class="font-caption text-caption text-outline font-mono">group_collections.id</span>
+</div>
+<select class="w-full h-9 px-space-md rounded-lg bg-surface text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all">
+<option selected="" value="col_bds">Bất động sản &amp; Nhà cho thuê</option>
+<option value="col_tech">Công nghệ &amp; Lập trình</option>
+<option value="col_job">Tuyển dụng việc làm</option>
+<option value="col_general">Tổng hợp</option>
+</select>
+</div>
+</div>
+<!-- Field: notes -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex justify-between items-center">
+<label class="font-label-md text-label-md font-medium text-on-surface">Ghi chú vận hành</label>
+<span class="font-caption text-caption text-outline font-mono">groups.notes</span>
+</div>
+<textarea class="w-full p-space-md rounded-lg bg-surface text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all resize-none leading-relaxed" placeholder="Nhập ghi chú hoặc quy tắc nhóm nếu có (Ví dụ: Không đăng quá 2 bài/ngày)..." rows="3">Nhóm kiểm duyệt gắt về hình ảnh bản đồ quy hoạch, ưu tiên đăng khung giờ 11h - 13h trưa.</textarea>
+</div>
+<!-- Helper Alert Notification -->
+<div class="p-space-md rounded-lg bg-surface-container-low flex items-center gap-space-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px] text-primary">verified</span>
+<span class="font-body-sm text-body-sm">
+            Kiểm tra trùng lặp nhóm tự động trong danh sách của bạn theo <strong class="text-on-surface">group_uid</strong> và <strong class="text-on-surface">group_url</strong>.
+          </span>
+</div>
+<!-- Actions -->
+<div class="flex items-center justify-end gap-space-md pt-space-xs">
+<button class="h-9 px-space-lg bg-surface-container-low text-on-surface hover:bg-surface-container font-label-md text-label-md font-medium rounded-lg transition-colors" onclick="switchModalView('modal-publish')" type="button">
+            Hủy
+          </button>
+<button class="h-9 px-space-xl bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md font-semibold rounded-lg shadow-sm transition-all flex items-center gap-space-xs" type="button">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+<span>Thêm nhóm</span>
+</button>
+</div>
+</form>
+</div>
+<!-- MODAL 3: POST-13 NHẬP NHÓM TỪ FILE CSV -->
+<div class="hidden relative z-10 w-full max-w-5xl mx-auto my-auto flex flex-col bg-surface-container-lowest rounded-xl shadow-xl overflow-hidden transition-all duration-300" id="modal-csv-view">
+<!-- Header -->
+<div class="flex items-start justify-between px-space-xl py-space-lg bg-surface-container-lowest">
+<div class="flex items-start gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-primary-fixed flex items-center justify-center text-primary mt-0.5">
+<span class="material-symbols-outlined text-[24px]">csv</span>
+</div>
+<div>
+<div class="flex items-center gap-space-xs">
+<h2 class="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight">Nhập danh sách nhóm từ file CSV</h2>
+<span class="font-caption text-caption px-space-xs py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-semibold uppercase">POST-13</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+              Tải lên tệp danh sách để nhập hàng loạt vào thư viện nhóm đích. Cấu trúc yêu cầu: <code class="font-mono text-caption text-primary">group_name, group_url, group_uid, member_count, requires_approval, notes</code>
+</p>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<button class="h-8 px-space-md bg-surface-container-low hover:bg-surface-container text-primary font-label-sm text-label-sm font-semibold rounded-lg transition-colors flex items-center gap-space-xs" type="button">
+<span class="material-symbols-outlined text-[16px]">download</span>
+<span>Tải file mẫu (.csv)</span>
+</button>
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors" onclick="switchModalView('modal-publish')">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+</div>
+<!-- Drag & Drop Zone with Active File -->
+<div class="px-space-xl py-space-md bg-surface-container-lowest">
+<div class="p-space-lg rounded-xl bg-surface-container-low flex flex-col sm:flex-row items-center justify-between gap-space-lg">
+<div class="flex items-center gap-space-md">
+<div class="w-12 h-12 rounded-lg bg-primary-container text-on-primary flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[28px]">description</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-md text-label-md font-semibold text-on-surface">danh_sach_nhom_bds_hn.csv</span>
+<span class="font-caption text-caption px-1.5 py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-mono font-medium">42.5 KB</span>
+</div>
+<span class="font-caption text-caption text-on-surface-variant mt-0.5">Đã phân tích xong • Mã hóa UTF-8 • 25 hàng dữ liệu phát hiện</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<button class="h-8 px-space-md bg-surface-container text-on-surface hover:bg-surface-container-high font-label-sm text-label-sm font-medium rounded-lg transition-colors flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[16px]">sync</span>
+<span>Chọn file khác</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Validation Result Computed Summary (4 Metrics Cards) -->
+<div class="px-space-xl py-space-sm grid grid-cols-2 md:grid-cols-4 gap-gutter bg-surface-container-lowest">
+<!-- Metric 1: Total Rows -->
+<div class="p-space-md rounded-lg bg-surface-container flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-caption text-caption uppercase tracking-wider text-on-surface-variant font-medium">Tổng số dòng</span>
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant">format_list_numbered</span>
+</div>
+<div class="flex items-baseline gap-space-xs mt-space-xs">
+<span class="font-headline-lg text-headline-lg font-bold text-on-surface">25</span>
+<span class="font-caption text-caption text-on-surface-variant">dòng</span>
+</div>
+</div>
+<!-- Metric 2: Valid Rows -->
+<div class="p-space-md rounded-lg bg-primary-fixed/40 flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-caption text-caption uppercase tracking-wider text-on-primary-fixed font-semibold">Hợp lệ</span>
+<span class="material-symbols-outlined text-[18px] text-primary">check_circle</span>
+</div>
+<div class="flex items-baseline gap-space-xs mt-space-xs">
+<span class="font-headline-lg text-headline-lg font-bold text-primary">22</span>
+<span class="font-caption text-caption text-on-primary-fixed">nhóm sẵn sàng</span>
+</div>
+</div>
+<!-- Metric 3: Duplicates -->
+<div class="p-space-md rounded-lg bg-tertiary-fixed/40 flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-caption text-caption uppercase tracking-wider text-on-tertiary-fixed font-semibold">Trùng lặp</span>
+<span class="material-symbols-outlined text-[18px] text-tertiary">content_copy</span>
+</div>
+<div class="flex items-baseline gap-space-xs mt-space-xs">
+<span class="font-headline-lg text-headline-lg font-bold text-tertiary">2</span>
+<span class="font-caption text-caption text-on-tertiary-fixed">đã có trong kho</span>
+</div>
+</div>
+<!-- Metric 4: Errors -->
+<div class="p-space-md rounded-lg bg-error-container/40 flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-caption text-caption uppercase tracking-wider text-on-error-container font-semibold">Dòng lỗi</span>
+<span class="material-symbols-outlined text-[18px] text-error">error</span>
+</div>
+<div class="flex items-baseline gap-space-xs mt-space-xs">
+<span class="font-headline-lg text-headline-lg font-bold text-error">1</span>
+<span class="font-caption text-caption text-on-error-container">thiếu group_url</span>
+</div>
+</div>
+</div>
+<!-- Data Preview Table -->
+<div class="px-space-xl py-space-sm bg-surface-container-lowest">
+<div class="w-full overflow-x-auto rounded-lg bg-surface-container-lowest">
+<table class="w-full text-left font-body-sm text-body-sm">
+<thead>
+<tr class="bg-surface-container text-on-surface-variant font-label-sm text-label-sm select-none">
+<th class="py-space-sm px-space-md w-12 text-center">Dòng</th>
+<th class="py-space-sm px-space-md w-32">Trạng thái</th>
+<th class="py-space-sm px-space-md">Tên nhóm (group_name)</th>
+<th class="py-space-sm px-space-md">Đường dẫn nhóm (group_url)</th>
+<th class="py-space-sm px-space-md w-28">Thành viên</th>
+<th class="py-space-sm px-space-md w-28">Kiểm duyệt</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container bg-surface-container-lowest">
+<!-- Sample Row 1 - Valid -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="py-space-sm px-space-md text-center font-mono text-outline font-label-sm text-label-sm">#01</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary-fixed/60 text-on-primary-fixed font-caption text-caption font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span> Hợp lệ
+                  </span>
+</td>
+<td class="py-space-sm px-space-md font-medium text-on-surface">Chung Cư Cao Cấp Sunshine City</td>
+<td class="py-space-sm px-space-md text-on-surface-variant font-mono text-caption truncate max-w-xs">facebook.com/groups/sunshinecityhanoi</td>
+<td class="py-space-sm px-space-md text-on-surface font-mono">14,200</td>
+<td class="py-space-sm px-space-md text-on-surface-variant">Có</td>
+</tr>
+<!-- Sample Row 2 - Duplicate -->
+<tr class="hover:bg-surface-container-low transition-colors bg-tertiary-fixed/10">
+<td class="py-space-sm px-space-md text-center font-mono text-outline font-label-sm text-label-sm">#02</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-caption text-caption font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Trùng lặp
+                  </span>
+</td>
+<td class="py-space-sm px-space-md font-medium text-on-surface">Mua bán nhà đất Cầu Giấy (Đã có)</td>
+<td class="py-space-sm px-space-md text-on-surface-variant font-mono text-caption truncate max-w-xs">facebook.com/groups/batdongsanhanoi</td>
+<td class="py-space-sm px-space-md text-on-surface font-mono">85,420</td>
+<td class="py-space-sm px-space-md text-on-surface-variant">Có</td>
+</tr>
+<!-- Sample Row 3 - Error -->
+<tr class="hover:bg-surface-container-low transition-colors bg-error-container/10">
+<td class="py-space-sm px-space-md text-center font-mono text-error font-label-sm text-label-sm">#03</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-error-container text-on-error-container font-caption text-caption font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span> Lỗi định dạng
+                  </span>
+</td>
+<td class="py-space-sm px-space-md font-medium text-error">Hội Đầu Tư BĐS Đông Anh</td>
+<td class="py-space-sm px-space-md text-error font-mono text-caption">[TRỐNG URL - BẮT BUỘC]</td>
+<td class="py-space-sm px-space-md text-on-surface font-mono">5,400</td>
+<td class="py-space-sm px-space-md text-on-surface-variant">Chưa rõ</td>
+</tr>
+<!-- Sample Row 4 - Valid -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="py-space-sm px-space-md text-center font-mono text-outline font-label-sm text-label-sm">#04</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary-fixed/60 text-on-primary-fixed font-caption text-caption font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span> Hợp lệ
+                  </span>
+</td>
+<td class="py-space-sm px-space-md font-medium text-on-surface">Cộng đồng Môi giới Nhà đất Thạch Thất - Hòa Lạc</td>
+<td class="py-space-sm px-space-md text-on-surface-variant font-mono text-caption truncate max-w-xs">facebook.com/groups/datnenhoalac2024</td>
+<td class="py-space-sm px-space-md text-on-surface font-mono">29,810</td>
+<td class="py-space-sm px-space-md text-on-surface-variant">Không</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Action Footer -->
+<div class="flex items-center justify-between px-space-xl py-space-md bg-surface-container-lowest">
+<button class="h-9 px-space-lg bg-surface-container-low text-on-surface hover:bg-surface-container font-label-md text-label-md font-medium rounded-lg transition-colors" onclick="switchModalView('modal-publish')" type="button">
+          Hủy
+        </button>
+<div class="flex items-center gap-space-md">
+<button class="h-9 px-space-md bg-surface-container text-on-surface hover:bg-surface-container-high font-label-md text-label-md font-medium rounded-lg transition-colors flex items-center gap-space-xs" type="button">
+<span class="material-symbols-outlined text-[18px]">rule</span>
+<span>Kiểm tra lại dữ liệu</span>
+</button>
+<button class="h-9 px-space-xl bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md font-semibold rounded-lg shadow-sm transition-all flex items-center gap-space-xs" type="button">
+<span class="material-symbols-outlined text-[18px]">publish</span>
+<span>Nhập 22 nhóm hợp lệ</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script>
+  function switchModalView(viewId) {
+    const views = ['modal-publish', 'modal-addgroup', 'modal-csv'];
+    const activeBtnClass = "bg-primary-container text-on-primary font-semibold shadow-sm";
+    const inactiveBtnClass = "text-on-surface-variant hover:bg-surface-container font-medium";
+
+    views.forEach(v => {
+      const el = document.getElementById(v + '-view');
+      const btn = document.getElementById('tab-btn-' + v.replace('modal-', ''));
+      if (el) {
+        if (v === viewId) {
+          el.classList.remove('hidden');
+          if (btn) {
+            btn.className = "flex items-center gap-space-xs px-space-lg py-space-xs rounded-lg " + activeBtnClass;
+          }
+        } else {
+          el.classList.add('hidden');
+          if (btn) {
+            btn.className = "flex items-center gap-space-xs px-space-lg py-space-xs rounded-lg " + inactiveBtnClass;
+          }
+        }
+      }
+    });
+  }
+</script></main></div></body></html>
