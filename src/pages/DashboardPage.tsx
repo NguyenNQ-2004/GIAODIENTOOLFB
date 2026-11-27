@@ -10,7 +10,11 @@ import {
   getVietnamDateKey,
   isWithinDateFilter,
 } from '../utils/dateTime';
-import { getTaskProgress, TASK_STATUS_META } from '../utils/taskStatus';
+import {
+  getTaskProgress,
+  isScheduledTaskOverdue,
+  TASK_STATUS_META,
+} from '../utils/taskStatus';
 
 const ALL_STATUSES: TaskStatus[] = [
   'SCHEDULED',
@@ -367,6 +371,11 @@ export const DashboardPage: React.FC = () => {
                         >
                           {meta.label}
                         </span>
+                        {isScheduledTaskOverdue(task) && (
+                          <span className="px-2 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-800 text-[10px] font-bold">
+                            Quá giờ lịch
+                          </span>
+                        )}
                         <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-semibold">
                           {task.targetType === 'GROUP' ? 'Nhóm Facebook' : 'Fanpage'}
                         </span>

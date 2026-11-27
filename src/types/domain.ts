@@ -1,7 +1,7 @@
 /**
- * Domain models aligned with the 19-table PostgreSQL schema contract.
+ * Canonical Domain Models aligned with the 19-table PostgreSQL schema contract.
  * All timestamps are ISO-8601 UTC strings.
- * No out-of-scope fields (cookies, anti-checkpoint, human emulation, pingMs, IP).
+ * TypeScript uses camelCase; PostgreSQL columns map 1-to-1 in snake_case (see docs/DATA_CONTRACT.md).
  */
 
 export type UserRole = 'CUSTOMER' | 'ADMIN';
@@ -10,7 +10,7 @@ export type UserStatus = 'ACTIVE' | 'LOCKED';
 export interface User {
   id: string;
   email: string;
-  fullName: string;
+  displayName: string; // DB: display_name
   avatarUrl: string | null;
   role: UserRole;
   status: UserStatus;
@@ -92,6 +92,7 @@ export interface MediaAttachment {
   sizeBytes: number;
   mediaType: MediaType;
   status: MediaStatus;
+  /** Persistent remote URL when backed by Object Storage; null in browser-local IndexedDB DEMO mode */
   previewUrl: string | null;
   sortOrder: number;
 }
@@ -194,18 +195,19 @@ export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
 export type PaymentOrderStatus = 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED' | 'CANCELLED';
 export type PaymentMethod = 'BANK_TRANSFER' | 'VIETQR';
 
+/**
+ * Canonical Plan DB entity (strictly matches approved schema; no unapproved description/features columns).
+ */
 export interface Plan {
   id: string;
   code: string;
   name: string;
-  description: string;
-  priceMonthlyVnd: number;
-  priceYearlyVnd: number;
-  maxFacebookAccounts: number;
-  maxGroups: number;
-  maxScheduledTasksPerDay: number;
-  features: string[];
-  isActive: boolean;
+  monthlyPriceVnd: number; // DB: monthly_price_vnd
+  yearlyPriceVnd: number; // DB: yearly_price_vnd
+  maxFacebookAccounts: number; // DB: max_facebook_accounts
+  maxSavedGroups: number; // DB: max_saved_groups
+  maxScheduledTasks: number; // DB: max_scheduled_tasks (concurrent SCHEDULED tasks)
+  isActive: boolean; // DB: is_active
   createdAt: string;
   updatedAt: string;
 }
@@ -215,9 +217,9 @@ export interface Subscription {
   userId: string;
   planId: string;
   billingPeriod: BillingPeriod;
+  startsAt: string; // DB: starts_at
+  expiresAt: string; // DB: expires_at
   status: SubscriptionStatus;
-  startsAt: string;
-  endsAt: string;
   createdAt: string;
   updatedAt: string;
 }

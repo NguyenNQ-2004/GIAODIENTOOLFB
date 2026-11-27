@@ -1,4 +1,4 @@
-# Screen & Route Mapping
+# Screen & Route Mapping (V3)
 
 | # | Screen | Route | Guard | Primary Component |
 |---|---|---|---|---|
@@ -15,9 +15,10 @@
 | 11 | Admin — Users | `/admin` (tab `users`) | AdminGuard | `src/pages/AdminPage.tsx` |
 | 12 | Admin — Plans | `/admin` (tab `plans`) | AdminGuard | `src/pages/AdminPage.tsx` |
 | 13 | Admin — Payments | `/admin` (tab `payments`) | AdminGuard | `src/pages/AdminPage.tsx` |
-| 14 | Extension Popup Preview | `/extension-preview` | AuthGuard | `src/pages/ExtensionPopupPage.tsx` |
+| 14 | Extension Popup Preview *(Dev/DEMO only)* | `/extension-preview` | `IS_DEV_OR_DEMO` + AuthGuard | `src/pages/ExtensionPopupPage.tsx` |
 
-## Default Redirects
-- `/` -> `/login` when unauthenticated, `/post` when authenticated.
-- Unknown routes (`*`) -> `/login` when unauthenticated, `/post` when authenticated.
-- Customer accessing `/admin` directly -> renders explicit **Không có quyền truy cập (Access Denied)** screen (and Admin nav link is hidden in `LayoutShell`).
+## Default Redirects & DEMO Boundary
+- `/` → `/login` when unauthenticated, `/post` when authenticated.
+- Unknown routes (`*`) → `/login` when unauthenticated, `/post` when authenticated.
+- Customer accessing `/admin` directly → renders explicit **Không có quyền truy cập (Access Denied)** screen (and Admin nav link is hidden in `LayoutShell`).
+- `/extension-preview` is mounted and linked ONLY when `IS_DEV_OR_DEMO` is true (`import.meta.env.DEV || IS_DEMO_MODE`). When `VITE_DEMO_MODE=false` in production build, `/extension-preview`, quick DEMO logins, Reset DEMO button, and Admin DEMO payment confirmation buttons are hidden.

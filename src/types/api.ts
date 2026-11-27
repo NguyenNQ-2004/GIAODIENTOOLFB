@@ -34,7 +34,7 @@ export interface LoginRequest {
 }
 
 export interface RegisterRequest {
-  fullName: string;
+  displayName: string;
   email: string;
   password: string;
 }
@@ -96,6 +96,11 @@ export interface CreatePublishingTaskRequest {
   pairs: CreateTaskPairInput[];
 }
 
+export interface RescheduleTaskRequest {
+  taskId: string;
+  scheduledAt: string;
+}
+
 export interface ConfirmTaskItemRequest {
   taskId: string;
   itemId: string;
@@ -120,13 +125,11 @@ export interface UpsertPlanRequest {
   id?: string;
   code: string;
   name: string;
-  description: string;
-  priceMonthlyVnd: number;
-  priceYearlyVnd: number;
+  monthlyPriceVnd: number;
+  yearlyPriceVnd: number;
   maxFacebookAccounts: number;
-  maxGroups: number;
-  maxScheduledTasksPerDay: number;
-  features: string[];
+  maxSavedGroups: number;
+  maxScheduledTasks: number;
   isActive: boolean;
 }
 
@@ -134,12 +137,14 @@ export interface AdminUpdateUserRequest {
   userId: string;
   role?: UserRole;
   status?: UserStatus;
-  fullName?: string;
+  displayName?: string;
 }
 
 export interface AdminConfirmPaymentRequest {
   orderId: string;
   providerReference?: string;
+  /** Required when order changes plan while user still has an active subscription on a different plan */
+  acknowledgeUnapprovedPlanChangePolicy?: boolean;
 }
 
 export interface ServiceResult<T> {

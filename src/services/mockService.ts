@@ -1,3 +1,9 @@
+import {
+  DEMO_SCHEMA_VERSION,
+  LEGACY_STORAGE_KEYS,
+  STORAGE_DB_KEY,
+  STORAGE_SESSION_KEY,
+} from '../config/demoConfig';
 import { createSeedDemoDatabase, type DemoDatabase } from '../data/mockData';
 import type {
   AdminConfirmPaymentRequest,
@@ -11,6 +17,7 @@ import type {
   ForgotPasswordRequest,
   LoginRequest,
   RegisterRequest,
+  RescheduleTaskRequest,
   ResetPasswordRequest,
   SavePostTemplateRequest,
   ServiceResult,
@@ -34,6 +41,7 @@ import type {
 } from '../types/domain';
 import { addDaysIso, addMinutesIso, isFutureTimestamp, nowIso } from '../utils/dateTime';
 import {
+  classifyPaymentOrderIntent,
   computeDeviceConnectionStatus,
   computeSubscriptionUsage,
   generateId,
@@ -41,12 +49,18 @@ import {
 } from '../utils/formatters';
 import {
   cancelTask as applyCancelTask,
+  canCancelTask,
+  canPauseTask,
+  canRescheduleTask,
+  canResumeTask,
   confirmTaskItem as applyConfirmTaskItem,
   deriveTaskStatus,
   pauseTask as applyPauseTask,
   resumeTask as applyResumeTask,
   retryAllFailedItems as applyRetryAllFailedItems,
   retryTaskItem as applyRetryTaskItem,
+  validateRetryItem,
+  validateUserConfirmItem,
 } from '../utils/taskStatus';
 import {
   cloneMediaAttachments,
@@ -66,9 +80,7 @@ import type {
   PostServiceContract,
   TaskServiceContract,
 } from './contracts';
-
-const STORAGE_DB_KEY = 'fbpostpro_demo_db_v2';
-const STORAGE_SESSION_KEY = 'fbpostpro_demo_session_user_id_v2';
+import { demoMediaStorage } from './mediaStorage';
 
 // Non-production prototype password lookup (in-memory only, never persisted to localStorage)
 const DEMO_PASSWORDS: Record<string, string> = {
@@ -76,6 +88,17 @@ const DEMO_PASSWORDS: Record<string, string> = {
   'expired@demo.fbpostpro.local': 'Demo@1234',
   'admin@demo.fbpostpro.local': 'Admin@1234',
 };
+
+interface PersistedEnvelope {
+  schemaVersion: number;
+  data: DemoDatabase;
+}
+
+export interface ReactiveStoreSnapshot {
+  db: DemoDatabase;
+  currentUserId: string | null;
+  schemaMigrationNotice: string | null;
+}
 
 function safeStorageGet(key: string): string | null {
   try {
@@ -104,14 +127,60 @@ function safeStorageRemove(key: string): void {
   }
 }
 
-function ensureTenDraftSlots(db: DemoDatabase, userId: string): void {
+function isValidV3Database(candidate: unknown): candidate is DemoDatabase {
+  if (!candidate || typeof candidate !== 'object') return false;
+  const db = candidate as Partial<DemoDatabase>;
+  if (
+    !Array.isArray(db.users) ||
+    !Array.isArray(db.plans) ||
+    !Array.isArray(db.subscriptions) ||
+    !Array.isArray(db.accounts) ||
+    !Array.isArray(db.pages) ||
+    !Array.isArray(db.groups) ||
+    !Array.isArray(db.collections) ||
+    !Array.isArray(db.collectionItems) ||
+    !Array.isArray(db.posts) ||
+    !Array.isArray(db.tasks) ||
+    !Array.isArray(db.devices) ||
+    !Array.isArray(db.orders) ||
+    !Array.isArray(db.auditLogs)
+  ) {
+    return false;
+  }
+
+  // Validate canonical v3 field contracts on sample records
+  const hasInvalidUser = db.users.some(
+    (u) => !u || typeof (u as User).displayName !== 'string'
+  );
+  if (hasInvalidUser) return false;
+
+  const hasInvalidPlan = db.plans.some(
+    (p) =>
+      !p ||
+      typeof (p as Plan).monthlyPriceVnd !== 'number' ||
+      typeof (p as Plan).yearlyPriceVnd !== 'number' ||
+      typeof (p as Plan).maxSavedGroups !== 'number' ||
+      typeof (p as Plan).maxScheduledTasks !== 'number'
+  );
+  if (hasInvalidPlan) return false;
+
+  const hasInvalidSub = db.subscriptions.some(
+    (s) => !s || typeof (s as Subscription).expiresAt !== 'string'
+  );
+  if (hasInvalidSub) return false;
+
+  return true;
+}
+
+function ensureTenDraftSlotsPosts(posts: Post[], userId: string): Post[] {
   const ts = nowIso();
+  const additions: Post[] = [];
   for (let slot = 1; slot <= 10; slot++) {
-    const exists = db.posts.some(
+    const exists = posts.some(
       (p) => p.userId === userId && p.status === 'DRAFT' && p.slotNumber === slot
     );
     if (!exists) {
-      db.posts.push({
+      additions.push({
         id: `draft-${userId}-${slot}`,
         userId,
         slotNumber: slot,
@@ -125,6 +194,7 @@ function ensureTenDraftSlots(db: DemoDatabase, userId: string): void {
       });
     }
   }
+  return additions.length > 0 ? [...posts, ...additions] : posts;
 }
 
 export class MockAppService
@@ -139,28 +209,23 @@ export class MockAppService
 {
   private db: DemoDatabase;
   private currentUserId: string | null = null;
+  private schemaMigrationNotice: string | null = null;
+  private snapshot: ReactiveStoreSnapshot;
+  private listeners = new Set<() => void>();
+  private useStorage: boolean;
   private sessionPasswords: Record<string, string> = { ...DEMO_PASSWORDS };
   private resetTokens: Map<string, { email: string; expiresAt: number }> = new Map();
 
-  constructor(initialDb?: DemoDatabase) {
+  constructor(initialDb?: DemoDatabase, options?: { useStorage?: boolean }) {
+    this.useStorage = options?.useStorage ?? !initialDb;
+
     if (initialDb) {
       this.db = initialDb;
-    } else {
-      const saved = safeStorageGet(STORAGE_DB_KEY);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved) as DemoDatabase;
-          if (parsed && Array.isArray(parsed.users) && Array.isArray(parsed.plans)) {
-            this.db = parsed;
-          } else {
-            this.db = createSeedDemoDatabase();
-          }
-        } catch {
-          this.db = createSeedDemoDatabase();
-        }
-      } else {
-        this.db = createSeedDemoDatabase();
-      }
+    } else if (this.useStorage) {
+      const { db, migrationNotice } = this.loadOrMigrateFromStorage();
+      this.db = db;
+      this.schemaMigrationNotice = migrationNotice;
+
       const savedSessionUserId = safeStorageGet(STORAGE_SESSION_KEY);
       if (savedSessionUserId && this.db.users.some((u) => u.id === savedSessionUserId)) {
         const user = this.db.users.find((u) => u.id === savedSessionUserId);
@@ -168,32 +233,170 @@ export class MockAppService
           this.currentUserId = savedSessionUserId;
         }
       }
+    } else {
+      this.db = createSeedDemoDatabase();
     }
+
+    this.snapshot = {
+      db: this.db,
+      currentUserId: this.currentUserId,
+      schemaMigrationNotice: this.schemaMigrationNotice,
+    };
   }
 
-  private persist(): void {
-    safeStorageSet(STORAGE_DB_KEY, JSON.stringify(this.db));
-    if (this.currentUserId) {
-      safeStorageSet(STORAGE_SESSION_KEY, this.currentUserId);
+  private loadOrMigrateFromStorage(): { db: DemoDatabase; migrationNotice: string | null } {
+    const rawV3 = safeStorageGet(STORAGE_DB_KEY);
+    const hasLegacyKeys = LEGACY_STORAGE_KEYS.some((key) => safeStorageGet(key) !== null);
+
+    if (rawV3) {
+      try {
+        const parsed = JSON.parse(rawV3) as Partial<PersistedEnvelope>;
+        if (
+          parsed &&
+          parsed.schemaVersion === DEMO_SCHEMA_VERSION &&
+          isValidV3Database(parsed.data)
+        ) {
+          if (hasLegacyKeys) {
+            LEGACY_STORAGE_KEYS.forEach((key) => safeStorageRemove(key));
+          }
+          return { db: parsed.data, migrationNotice: null };
+        }
+      } catch {
+        // Fall through to clean reset
+      }
+
+      // Corrupt or outdated payload under current key
+      LEGACY_STORAGE_KEYS.forEach((key) => safeStorageRemove(key));
+      safeStorageRemove(STORAGE_SESSION_KEY);
+      const fresh = createSeedDemoDatabase();
+      this.writeStorageEnvelope(fresh, null);
+      return {
+        db: fresh,
+        migrationNotice:
+          'Dữ liệu DEMO cục bộ không tương thích hoặc bị hỏng đã được đặt lại sang cấu trúc chuẩn v3.',
+      };
+    }
+
+    if (hasLegacyKeys) {
+      LEGACY_STORAGE_KEYS.forEach((key) => safeStorageRemove(key));
+      safeStorageRemove(STORAGE_SESSION_KEY);
+      const fresh = createSeedDemoDatabase();
+      this.writeStorageEnvelope(fresh, null);
+      return {
+        db: fresh,
+        migrationNotice:
+          'Dữ liệu DEMO từ phiên bản cũ (v1/v2) đã được tự động nâng cấp và đặt lại về dữ liệu mẫu chuẩn v3.',
+      };
+    }
+
+    return { db: createSeedDemoDatabase(), migrationNotice: null };
+  }
+
+  private writeStorageEnvelope(db: DemoDatabase, sessionUserId: string | null): void {
+    if (!this.useStorage) return;
+    const envelope: PersistedEnvelope = {
+      schemaVersion: DEMO_SCHEMA_VERSION,
+      data: db,
+    };
+    safeStorageSet(STORAGE_DB_KEY, JSON.stringify(envelope));
+    if (sessionUserId) {
+      safeStorageSet(STORAGE_SESSION_KEY, sessionUserId);
     } else {
       safeStorageRemove(STORAGE_SESSION_KEY);
     }
   }
 
+  /**
+   * Structural-sharing immutable commit:
+   * - Replaces `this.db` with a new top-level reference so all reactive selectors immediately update.
+   * - Keeps untouched slices referentially stable (no full deep clone per mutation).
+   * - Persists to localStorage and notifies subscribed React stores.
+   */
+  private commit(
+    nextDb: DemoDatabase,
+    nextUserId: string | null = this.currentUserId,
+    nextNotice: string | null = this.schemaMigrationNotice
+  ): void {
+    this.db = nextDb;
+    this.currentUserId = nextUserId;
+    this.schemaMigrationNotice = nextNotice;
+    this.snapshot = {
+      db: this.db,
+      currentUserId: this.currentUserId,
+      schemaMigrationNotice: this.schemaMigrationNotice,
+    };
+    this.writeStorageEnvelope(this.db, this.currentUserId);
+    this.listeners.forEach((listener) => listener());
+  }
+
+  public subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  };
+
+  public getStoreSnapshot = (): ReactiveStoreSnapshot => {
+    return this.snapshot;
+  };
+
   public getDatabaseSnapshot(): DemoDatabase {
     return this.db;
   }
 
+  public getSchemaMigrationNotice(): string | null {
+    return this.schemaMigrationNotice;
+  }
+
+  public dismissSchemaMigrationNotice(): void {
+    if (!this.schemaMigrationNotice) return;
+    this.commit(this.db, this.currentUserId, null);
+  }
+
+  /**
+   * Verifies whether a media attachment ID is still referenced by any draft,
+   * saved post, or publishing task item snapshot across the entire database.
+   */
+  public isMediaReferenced(mediaId: string): boolean {
+    for (const post of this.db.posts) {
+      if (post.media.some((m) => m.id === mediaId)) {
+        return true;
+      }
+    }
+    for (const task of this.db.tasks) {
+      for (const item of task.items) {
+        if (item.mediaSnapshots.some((m) => m.id === mediaId)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private cleanupOrphanMediaIds(candidateIds: string[]): void {
+    for (const mediaId of candidateIds) {
+      if (!this.isMediaReferenced(mediaId)) {
+        void demoMediaStorage.deleteMediaBlob(mediaId);
+      }
+    }
+  }
+
   public resetDemoDatabase(): DemoDatabase {
-    this.db = createSeedDemoDatabase();
+    const freshDb = createSeedDemoDatabase();
     this.sessionPasswords = { ...DEMO_PASSWORDS };
     this.resetTokens.clear();
-    safeStorageRemove(STORAGE_DB_KEY);
-    if (this.currentUserId && !this.db.users.some((u) => u.id === this.currentUserId)) {
-      this.currentUserId = null;
-      safeStorageRemove(STORAGE_SESSION_KEY);
+    if (this.useStorage) {
+      safeStorageRemove(STORAGE_DB_KEY);
+      LEGACY_STORAGE_KEYS.forEach((key) => safeStorageRemove(key));
     }
-    this.persist();
+    void demoMediaStorage.clearAllDemoMedia();
+
+    const nextUserId =
+      this.currentUserId && freshDb.users.some((u) => u.id === this.currentUserId)
+        ? this.currentUserId
+        : null;
+
+    this.commit(freshDb, nextUserId, null);
     return this.db;
   }
 
@@ -249,13 +452,12 @@ export class MockAppService
     }
 
     const ts = nowIso();
-    user.lastLoginAt = ts;
-    user.updatedAt = ts;
-    ensureTenDraftSlots(this.db, user.id);
-    this.currentUserId = user.id;
-    this.persist();
+    const updatedUser: User = { ...user, lastLoginAt: ts, updatedAt: ts };
+    const nextUsers = this.db.users.map((u) => (u.id === user.id ? updatedUser : u));
+    const nextPosts = ensureTenDraftSlotsPosts(this.db.posts, user.id);
 
-    return { ok: true, data: { user, isDemoSession: true } };
+    this.commit({ ...this.db, users: nextUsers, posts: nextPosts }, user.id);
+    return { ok: true, data: { user: updatedUser, isDemoSession: true } };
   }
 
   public loginAsDemoUser(userId: string): ServiceResult<AuthSessionResponse> {
@@ -270,20 +472,20 @@ export class MockAppService
       };
     }
     const ts = nowIso();
-    user.lastLoginAt = ts;
-    user.updatedAt = ts;
-    ensureTenDraftSlots(this.db, user.id);
-    this.currentUserId = user.id;
-    this.persist();
-    return { ok: true, data: { user, isDemoSession: true } };
+    const updatedUser: User = { ...user, lastLoginAt: ts, updatedAt: ts };
+    const nextUsers = this.db.users.map((u) => (u.id === user.id ? updatedUser : u));
+    const nextPosts = ensureTenDraftSlotsPosts(this.db.posts, user.id);
+
+    this.commit({ ...this.db, users: nextUsers, posts: nextPosts }, user.id);
+    return { ok: true, data: { user: updatedUser, isDemoSession: true } };
   }
 
   public register(req: RegisterRequest): ServiceResult<AuthSessionResponse> {
-    const fullName = req.fullName.trim();
+    const displayName = req.displayName.trim();
     const email = req.email.trim().toLowerCase();
 
-    if (fullName.length < 2) {
-      return { ok: false, error: 'Vui lòng nhập họ và tên (tối thiểu 2 ký tự).' };
+    if (displayName.length < 2) {
+      return { ok: false, error: 'Vui lòng nhập họ và tên hiển thị (tối thiểu 2 ký tự).' };
     }
     if (!isValidEmail(email)) {
       return { ok: false, error: 'Địa chỉ email không hợp lệ.' };
@@ -300,7 +502,7 @@ export class MockAppService
     const newUser: User = {
       id: generateId(),
       email,
-      fullName,
+      displayName,
       avatarUrl: null,
       role: 'CUSTOMER',
       status: 'ACTIVE',
@@ -310,28 +512,38 @@ export class MockAppService
       updatedAt: ts,
     };
 
-    this.db.users.push(newUser);
     this.sessionPasswords[email] = req.password;
-    ensureTenDraftSlots(this.db, newUser.id);
+    const nextUsers = [...this.db.users, newUser];
+    const nextPosts = ensureTenDraftSlotsPosts(this.db.posts, newUser.id);
 
     // Grant 7-day Basic trial subscription in DEMO mode
     const basicPlan = this.db.plans.find((p) => p.code === 'BASIC') ?? this.db.plans[0];
-    if (basicPlan) {
-      this.db.subscriptions.push({
-        id: generateId(),
-        userId: newUser.id,
-        planId: basicPlan.id,
-        billingPeriod: 'MONTHLY',
-        status: 'ACTIVE',
-        startsAt: ts,
-        endsAt: addDaysIso(7),
-        createdAt: ts,
-        updatedAt: ts,
-      });
-    }
+    const nextSubscriptions = basicPlan
+      ? [
+          ...this.db.subscriptions,
+          {
+            id: generateId(),
+            userId: newUser.id,
+            planId: basicPlan.id,
+            billingPeriod: 'MONTHLY' as const,
+            status: 'ACTIVE' as const,
+            startsAt: ts,
+            expiresAt: addDaysIso(7),
+            createdAt: ts,
+            updatedAt: ts,
+          },
+        ]
+      : this.db.subscriptions;
 
-    this.currentUserId = newUser.id;
-    this.persist();
+    this.commit(
+      {
+        ...this.db,
+        users: nextUsers,
+        posts: nextPosts,
+        subscriptions: nextSubscriptions,
+      },
+      newUser.id
+    );
     return { ok: true, data: { user: newUser, isDemoSession: true } };
   }
 
@@ -368,12 +580,14 @@ export class MockAppService
     }
 
     const user = this.db.users.find((u) => u.email.toLowerCase() === entry.email);
+    let nextUsers = this.db.users;
     if (user) {
       this.sessionPasswords[entry.email] = req.newPassword;
-      user.updatedAt = nowIso();
+      const ts = nowIso();
+      nextUsers = this.db.users.map((u) => (u.id === user.id ? { ...u, updatedAt: ts } : u));
     }
     this.resetTokens.delete(token);
-    this.persist();
+    this.commit({ ...this.db, users: nextUsers });
     return {
       ok: true,
       data: { message: 'Đặt lại mật khẩu thành công (mô phỏng DEMO). Bạn có thể đăng nhập lại.' },
@@ -396,14 +610,14 @@ export class MockAppService
     if (!passCheck.valid) return { ok: false, error: passCheck.error };
 
     this.sessionPasswords[email] = req.newPassword;
-    user.updatedAt = nowIso();
-    this.persist();
+    const ts = nowIso();
+    const nextUsers = this.db.users.map((u) => (u.id === userId ? { ...u, updatedAt: ts } : u));
+    this.commit({ ...this.db, users: nextUsers });
     return { ok: true, data: { message: 'Đã cập nhật mật khẩu trong phiên DEMO.' } };
   }
 
   public logout(): void {
-    this.currentUserId = null;
-    this.persist();
+    this.commit({ ...this.db }, null);
   }
 
   // ==================== POSTS & DRAFTS ====================
@@ -416,18 +630,33 @@ export class MockAppService
     if (slotNumber < 1 || slotNumber > 10) {
       return { ok: false, error: 'Slot bài nháp không hợp lệ (1..10).' };
     }
-    ensureTenDraftSlots(this.db, userId);
-    const draft = this.db.posts.find(
+    const postsWithSlots = ensureTenDraftSlotsPosts(this.db.posts, userId);
+    const existing = postsWithSlots.find(
       (p) => p.userId === userId && p.status === 'DRAFT' && p.slotNumber === slotNumber
     );
-    if (!draft) return { ok: false, error: 'Không tìm thấy bài nháp.' };
+    if (!existing) return { ok: false, error: 'Không tìm thấy bài nháp.' };
 
-    if (patch.content !== undefined) draft.content = patch.content;
-    if (patch.linkUrl !== undefined) draft.linkUrl = patch.linkUrl;
-    if (patch.media !== undefined) draft.media = cloneMediaAttachments(patch.media);
-    draft.updatedAt = nowIso();
-    this.persist();
-    return { ok: true, data: { ...draft } };
+    const removedMediaIds =
+      patch.media !== undefined
+        ? existing.media
+            .filter((oldM) => !patch.media!.some((newM) => newM.id === oldM.id))
+            .map((m) => m.id)
+        : [];
+
+    const updatedDraft: Post = {
+      ...existing,
+      content: patch.content !== undefined ? patch.content : existing.content,
+      linkUrl: patch.linkUrl !== undefined ? patch.linkUrl : existing.linkUrl,
+      media: patch.media !== undefined ? cloneMediaAttachments(patch.media) : existing.media,
+      updatedAt: nowIso(),
+    };
+
+    const nextPosts = postsWithSlots.map((p) => (p.id === existing.id ? updatedDraft : p));
+    this.commit({ ...this.db, posts: nextPosts });
+    if (removedMediaIds.length > 0) {
+      this.cleanupOrphanMediaIds(removedMediaIds);
+    }
+    return { ok: true, data: updatedDraft };
   }
 
   public resetDraftSlot(userId: string, slotNumber: number): ServiceResult<Post> {
@@ -466,18 +695,21 @@ export class MockAppService
       updatedAt: ts,
     };
 
-    this.db.posts.unshift(savedPost);
-    this.persist();
+    this.commit({ ...this.db, posts: [savedPost, ...this.db.posts] });
     return { ok: true, data: savedPost };
   }
 
   public deleteSavedPost(userId: string, postId: string): ServiceResult<void> {
-    const idx = this.db.posts.findIndex(
+    const target = this.db.posts.find(
       (p) => p.id === postId && p.userId === userId && p.status === 'SAVED'
     );
-    if (idx === -1) return { ok: false, error: 'Không tìm thấy bài đã lưu.' };
-    this.db.posts.splice(idx, 1);
-    this.persist();
+    if (!target) return { ok: false, error: 'Không tìm thấy bài đã lưu.' };
+    const candidateMediaIds = target.media.map((m) => m.id);
+    const nextPosts = this.db.posts.filter((p) => p.id !== postId);
+    this.commit({ ...this.db, posts: nextPosts });
+    if (candidateMediaIds.length > 0) {
+      this.cleanupOrphanMediaIds(candidateMediaIds);
+    }
     return { ok: true };
   }
 
@@ -498,10 +730,11 @@ export class MockAppService
     const userGroups = this.db.groups.filter((g) => g.userId === userId);
     const plan = this.getUserPlan(userId);
     const sub = this.getUserSubscription(userId);
-    if (plan && isSubscriptionActive(sub) && userGroups.length >= plan.maxGroups) {
+    if (plan && isSubscriptionActive(sub) && userGroups.length >= plan.maxSavedGroups) {
       return {
         ok: false,
-        error: `Đã đạt hạn mức ${plan.maxGroups} nhóm của gói ${plan.name}.`,
+        code: 'QUOTA_EXCEEDED',
+        error: `Đã đạt hạn mức ${plan.maxSavedGroups} nhóm đã lưu của gói ${plan.name}.`,
       };
     }
 
@@ -532,8 +765,7 @@ export class MockAppService
       updatedAt: ts,
     };
 
-    this.db.groups.unshift(newGroup);
-    this.persist();
+    this.commit({ ...this.db, groups: [newGroup, ...this.db.groups] });
     return { ok: true, data: newGroup };
   }
 
@@ -542,8 +774,8 @@ export class MockAppService
     groupId: string,
     req: UpsertGroupRequest
   ): ServiceResult<FacebookGroup> {
-    const group = this.db.groups.find((g) => g.id === groupId && g.userId === userId);
-    if (!group) return { ok: false, error: 'Không tìm thấy nhóm cần cập nhật.' };
+    const existing = this.db.groups.find((g) => g.id === groupId && g.userId === userId);
+    if (!existing) return { ok: false, error: 'Không tìm thấy nhóm cần cập nhật.' };
 
     const groupName = req.groupName.trim();
     if (!groupName) return { ok: false, error: 'Tên nhóm không được để trống.' };
@@ -566,27 +798,36 @@ export class MockAppService
       };
     }
 
-    group.groupName = groupName;
-    group.groupUrl = normalizedUrl;
-    group.groupUid = resolvedUid;
-    group.memberCount =
-      req.memberCount !== undefined && req.memberCount !== null && req.memberCount >= 0
-        ? Math.floor(req.memberCount)
-        : null;
-    group.requiresApproval = req.requiresApproval ?? null;
-    group.notes = req.notes?.trim() || null;
-    group.updatedAt = nowIso();
+    const updated: FacebookGroup = {
+      ...existing,
+      groupName,
+      groupUrl: normalizedUrl,
+      groupUid: resolvedUid,
+      memberCount:
+        req.memberCount !== undefined && req.memberCount !== null && req.memberCount >= 0
+          ? Math.floor(req.memberCount)
+          : null,
+      requiresApproval: req.requiresApproval ?? null,
+      notes: req.notes?.trim() || null,
+      updatedAt: nowIso(),
+    };
 
-    this.persist();
-    return { ok: true, data: { ...group } };
+    const nextGroups = this.db.groups.map((g) => (g.id === groupId ? updated : g));
+    this.commit({ ...this.db, groups: nextGroups });
+    return { ok: true, data: updated };
   }
 
   public deleteGroup(userId: string, groupId: string): ServiceResult<void> {
-    const idx = this.db.groups.findIndex((g) => g.id === groupId && g.userId === userId);
-    if (idx === -1) return { ok: false, error: 'Không tìm thấy nhóm để xóa.' };
-    this.db.groups.splice(idx, 1);
-    this.db.collectionItems = this.db.collectionItems.filter((ci) => ci.groupId !== groupId);
-    this.persist();
+    const exists = this.db.groups.some((g) => g.id === groupId && g.userId === userId);
+    if (!exists) return { ok: false, error: 'Không tìm thấy nhóm để xóa.' };
+
+    const nextGroups = this.db.groups.filter((g) => g.id !== groupId);
+    const nextCollectionItems = this.db.collectionItems.filter((ci) => ci.groupId !== groupId);
+    this.commit({
+      ...this.db,
+      groups: nextGroups,
+      collectionItems: nextCollectionItems,
+    });
     return { ok: true };
   }
 
@@ -638,15 +879,17 @@ export class MockAppService
       createdAt: ts,
       updatedAt: ts,
     };
-    this.db.collections.push(col);
-    for (const groupId of uniqueGroupIds) {
-      this.db.collectionItems.push({
-        collectionId: col.id,
-        groupId,
-        createdAt: ts,
-      });
-    }
-    this.persist();
+    const newItems = uniqueGroupIds.map((groupId) => ({
+      collectionId: col.id,
+      groupId,
+      createdAt: ts,
+    }));
+
+    this.commit({
+      ...this.db,
+      collections: [...this.db.collections, col],
+      collectionItems: [...this.db.collectionItems, ...newItems],
+    });
     return { ok: true, data: col };
   }
 
@@ -655,16 +898,17 @@ export class MockAppService
     collectionId: string,
     name: string
   ): ServiceResult<GroupCollection> {
-    const col = this.db.collections.find(
+    const existing = this.db.collections.find(
       (c) => c.id === collectionId && c.userId === userId
     );
-    if (!col) return { ok: false, error: 'Không tìm thấy bộ sưu tập.' };
+    if (!existing) return { ok: false, error: 'Không tìm thấy bộ sưu tập.' };
     const trimmed = name.trim();
     if (!trimmed) return { ok: false, error: 'Tên bộ sưu tập không được để trống.' };
-    col.name = trimmed;
-    col.updatedAt = nowIso();
-    this.persist();
-    return { ok: true, data: { ...col } };
+
+    const updated: GroupCollection = { ...existing, name: trimmed, updatedAt: nowIso() };
+    const nextCollections = this.db.collections.map((c) => (c.id === collectionId ? updated : c));
+    this.commit({ ...this.db, collections: nextCollections });
+    return { ok: true, data: updated };
   }
 
   public setCollectionGroups(
@@ -672,10 +916,10 @@ export class MockAppService
     collectionId: string,
     groupIds: string[]
   ): ServiceResult<void> {
-    const col = this.db.collections.find(
+    const existing = this.db.collections.find(
       (c) => c.id === collectionId && c.userId === userId
     );
-    if (!col) return { ok: false, error: 'Không tìm thấy bộ sưu tập.' };
+    if (!existing) return { ok: false, error: 'Không tìm thấy bộ sưu tập.' };
 
     const validUserGroupIds = new Set(
       this.db.groups.filter((g) => g.userId === userId).map((g) => g.id)
@@ -685,32 +929,40 @@ export class MockAppService
     );
 
     const ts = nowIso();
-    this.db.collectionItems = this.db.collectionItems.filter(
+    const filteredItems = this.db.collectionItems.filter(
       (ci) => ci.collectionId !== collectionId
     );
-    for (const groupId of uniqueGroupIds) {
-      this.db.collectionItems.push({
-        collectionId,
-        groupId,
-        createdAt: ts,
-      });
-    }
-    col.updatedAt = ts;
-    this.persist();
+    const addedItems = uniqueGroupIds.map((groupId) => ({
+      collectionId,
+      groupId,
+      createdAt: ts,
+    }));
+    const nextCollections = this.db.collections.map((c) =>
+      c.id === collectionId ? { ...c, updatedAt: ts } : c
+    );
+
+    this.commit({
+      ...this.db,
+      collections: nextCollections,
+      collectionItems: [...filteredItems, ...addedItems],
+    });
     return { ok: true };
   }
 
   public deleteCollection(userId: string, collectionId: string): ServiceResult<void> {
-    const idx = this.db.collections.findIndex(
-      (c) => c.id === collectionId && c.userId === userId
-    );
-    if (idx === -1) return { ok: false, error: 'Không tìm thấy bộ sưu tập.' };
+    const exists = this.db.collections.some((c) => c.id === collectionId && c.userId === userId);
+    if (!exists) return { ok: false, error: 'Không tìm thấy bộ sưu tập.' };
+
     // Deleting collection removes join rows only; groups remain intact.
-    this.db.collections.splice(idx, 1);
-    this.db.collectionItems = this.db.collectionItems.filter(
+    const nextCollections = this.db.collections.filter((c) => c.id !== collectionId);
+    const nextCollectionItems = this.db.collectionItems.filter(
       (ci) => ci.collectionId !== collectionId
     );
-    this.persist();
+    this.commit({
+      ...this.db,
+      collections: nextCollections,
+      collectionItems: nextCollectionItems,
+    });
     return { ok: true };
   }
 
@@ -728,7 +980,7 @@ export class MockAppService
       return { ok: true, data: existingByKey };
     }
 
-    // Subscription & daily quota guard
+    // Active subscription guard
     const sub = this.getUserSubscription(userId);
     const plan = this.getUserPlan(userId);
     if (!isSubscriptionActive(sub) || !plan) {
@@ -739,37 +991,44 @@ export class MockAppService
       };
     }
 
-    const usage = computeSubscriptionUsage({
-      subscription: sub,
-      plan,
-      accounts: this.db.accounts.filter((a) => a.userId === userId),
-      groups: this.db.groups.filter((g) => g.userId === userId),
-      tasks: this.db.tasks.filter((t) => t.userId === userId),
-    });
-
-    if (usage.scheduledTodayUsed >= usage.scheduledTodayLimit) {
-      return {
-        ok: false,
-        code: 'QUOTA_EXCEEDED',
-        error: `Bạn đã dùng hết hạn mức ${usage.scheduledTodayLimit} tác vụ/ngày của gói ${plan.name}.`,
-      };
-    }
-
     if (req.pairs.length === 0) {
       return { ok: false, error: 'Vui lòng chọn ít nhất 1 cặp bài viết và đích đăng.' };
     }
 
-    // Validate scheduledAt if present
+    // Validate scheduledAt & concurrent SCHEDULED quota (maxScheduledTasks)
+    // Immediate tasks do NOT consume maxScheduledTasks!
     let isScheduledFuture = false;
     if (req.scheduledAt) {
       if (!isFutureTimestamp(req.scheduledAt)) {
         return { ok: false, error: 'Thời gian lên lịch phải nằm ở tương lai.' };
       }
       isScheduledFuture = true;
+
+      const usage = computeSubscriptionUsage({
+        subscription: sub,
+        plan,
+        accounts: this.db.accounts.filter((a) => a.userId === userId),
+        groups: this.db.groups.filter((g) => g.userId === userId),
+        tasks: this.db.tasks.filter((t) => t.userId === userId),
+      });
+
+      if (usage.scheduledTasksUsed >= usage.scheduledTasksLimit) {
+        return {
+          ok: false,
+          code: 'QUOTA_EXCEEDED',
+          error: `Bạn đã đạt hạn mức ${usage.scheduledTasksLimit} tác vụ đang chờ lịch (SCHEDULED) của gói ${plan.name}. Hãy hủy bớt lịch chờ hoặc nâng cấp gói.`,
+        };
+      }
     }
 
     // Validate account for PAGE mode
     if (req.targetType === 'PAGE') {
+      if (req.executionMode !== 'META_PAGE_API') {
+        return {
+          ok: false,
+          error: 'Tác vụ đăng Fanpage phải sử dụng chế độ META_PAGE_API.',
+        };
+      }
       if (!req.facebookAccountId) {
         return { ok: false, error: 'Vui lòng chọn tài khoản Facebook quản lý Fanpage.' };
       }
@@ -782,6 +1041,11 @@ export class MockAppService
           error: 'Tài khoản Facebook chưa kết nối Meta OAuth hợp lệ để đăng Fanpage.',
         };
       }
+    } else if (req.executionMode !== 'MANUAL_GROUP') {
+      return {
+        ok: false,
+        error: 'Tác vụ đăng Nhóm Facebook phải sử dụng chế độ MANUAL_GROUP.',
+      };
     }
 
     const ts = nowIso();
@@ -848,6 +1112,7 @@ export class MockAppService
             error: `Fanpage "${page.pageName}" không có quyền đăng bài (canPublish = false).`,
           };
         }
+        // META_PAGE_API items start in PENDING (task derives to SCHEDULED or QUEUED awaiting Meta Graph API backend)
         items.push({
           id: generateId(),
           taskId,
@@ -859,14 +1124,14 @@ export class MockAppService
           destinationNameSnapshot: page.pageName,
           destinationUrlSnapshot: page.pageUrl,
           mediaSnapshots: cloneMediaAttachments(post.media),
-          status: isScheduledFuture ? 'PENDING' : 'WAITING_CONFIRMATION',
+          status: 'PENDING',
           confirmationType: null,
           resultPostUrl: null,
           externalPostId: null,
           errorCode: null,
           errorMessage: null,
-          attemptCount: isScheduledFuture ? 0 : 1,
-          startedAt: isScheduledFuture ? null : ts,
+          attemptCount: 0,
+          startedAt: null,
           finishedAt: null,
           createdAt: ts,
           updatedAt: ts,
@@ -891,35 +1156,203 @@ export class MockAppService
       items,
     };
 
-    this.db.tasks.unshift(newTask);
-    this.persist();
+    this.commit({ ...this.db, tasks: [newTask, ...this.db.tasks] });
     return { ok: true, data: newTask };
   }
 
+  public rescheduleTask(
+    userId: string,
+    req: RescheduleTaskRequest
+  ): ServiceResult<PublishingTask> {
+    const task = this.db.tasks.find((t) => t.id === req.taskId && t.userId === userId);
+    if (!task) return { ok: false, error: 'Không tìm thấy tác vụ.' };
+    if (!canRescheduleTask(task)) {
+      return {
+        ok: false,
+        error: 'Chỉ có thể đổi lịch cho tác vụ hẹn giờ chưa bắt đầu thực hiện mục nào.',
+      };
+    }
+
+    const sub = this.getUserSubscription(userId);
+    const plan = this.getUserPlan(userId);
+    if (!isSubscriptionActive(sub) || !plan) {
+      return {
+        ok: false,
+        code: 'SUBSCRIPTION_INACTIVE',
+        error: 'Gói dịch vụ đã hết hạn. Vui lòng gia hạn để đổi lịch tác vụ.',
+      };
+    }
+
+    if (!isFutureTimestamp(req.scheduledAt)) {
+      return { ok: false, error: 'Thời gian lịch mới phải nằm ở tương lai.' };
+    }
+
+    // If resuming from PAUSED back to SCHEDULED, verify concurrent SCHEDULED quota
+    if (task.status !== 'SCHEDULED') {
+      const scheduledCount = this.db.tasks.filter(
+        (t) => t.userId === userId && t.status === 'SCHEDULED'
+      ).length;
+      if (scheduledCount >= plan.maxScheduledTasks) {
+        return {
+          ok: false,
+          code: 'QUOTA_EXCEEDED',
+          error: `Đã đạt hạn mức ${plan.maxScheduledTasks} tác vụ đang chờ lịch (SCHEDULED) của gói ${plan.name}.`,
+        };
+      }
+    }
+
+    const ts = nowIso();
+    const updated: PublishingTask = {
+      ...task,
+      scheduledAt: req.scheduledAt,
+      status: 'SCHEDULED',
+      updatedAt: ts,
+    };
+    const nextTasks = this.db.tasks.map((t) => (t.id === task.id ? updated : t));
+    this.commit({ ...this.db, tasks: nextTasks });
+    return { ok: true, data: updated };
+  }
+
+  /**
+   * DEMO scheduler trigger: transitions a SCHEDULED task to active when due (or simulated due in DEMO).
+   * If subscription expired before execution time, marks pending items FAILED with SUBSCRIPTION_EXPIRED.
+   */
+  public triggerDueScheduledTaskDemo(
+    userId: string,
+    taskId: string
+  ): ServiceResult<PublishingTask> {
+    const task = this.db.tasks.find((t) => t.id === taskId && t.userId === userId);
+    if (!task) return { ok: false, error: 'Không tìm thấy tác vụ.' };
+    if (task.status !== 'SCHEDULED') {
+      return { ok: false, error: 'Chỉ có thể kích hoạt tác vụ đang ở trạng thái Đã lên lịch (SCHEDULED).' };
+    }
+
+    const ts = nowIso();
+    const sub = this.getUserSubscription(userId);
+    if (!isSubscriptionActive(sub)) {
+      const failedItems: PublishingTaskItem[] = task.items.map((item) =>
+        item.status === 'PENDING'
+          ? {
+              ...item,
+              status: 'FAILED',
+              errorCode: 'SUBSCRIPTION_EXPIRED',
+              errorMessage: 'Gói dịch vụ đã hết hạn trước thời điểm tác vụ đến lịch chạy.',
+              finishedAt: ts,
+              updatedAt: ts,
+            }
+          : item
+      );
+      const failedTask: PublishingTask = {
+        ...task,
+        items: failedItems,
+        status: deriveTaskStatus(failedItems),
+        finishedAt: ts,
+        updatedAt: ts,
+      };
+      const nextTasks = this.db.tasks.map((t) => (t.id === task.id ? failedTask : t));
+      this.commit({ ...this.db, tasks: nextTasks });
+      return {
+        ok: false,
+        code: 'SUBSCRIPTION_INACTIVE',
+        data: failedTask,
+        error: 'Gói dịch vụ đã hết hạn trước giờ chạy. Tác vụ chuyển sang Thất bại.',
+      };
+    }
+
+    const nextItems: PublishingTaskItem[] = task.items.map((item) => {
+      if (item.status !== 'PENDING') return item;
+      if (task.executionMode === 'MANUAL_GROUP') {
+        return {
+          ...item,
+          status: 'WAITING_CONFIRMATION',
+          attemptCount: Math.max(1, item.attemptCount),
+          startedAt: item.startedAt ?? ts,
+          updatedAt: ts,
+        };
+      }
+      // META_PAGE_API remains PENDING in QUEUED task awaiting backend Meta Graph API worker
+      return {
+        ...item,
+        updatedAt: ts,
+      };
+    });
+
+    const effectiveScheduledAt =
+      task.scheduledAt && new Date(task.scheduledAt).getTime() <= new Date(ts).getTime()
+        ? task.scheduledAt
+        : ts;
+
+    const updated: PublishingTask = {
+      ...task,
+      scheduledAt: effectiveScheduledAt,
+      items: nextItems,
+      status: deriveTaskStatus(nextItems, { isScheduledFuture: false }),
+      startedAt: task.startedAt ?? ts,
+      updatedAt: ts,
+    };
+
+    const nextTasks = this.db.tasks.map((t) => (t.id === task.id ? updated : t));
+    this.commit({ ...this.db, tasks: nextTasks });
+    return { ok: true, data: updated };
+  }
+
   public pauseTask(userId: string, taskId: string): ServiceResult<PublishingTask> {
-    const idx = this.db.tasks.findIndex((t) => t.id === taskId && t.userId === userId);
-    if (idx === -1) return { ok: false, error: 'Không tìm thấy tác vụ.' };
-    const updated = applyPauseTask(this.db.tasks[idx], nowIso());
-    this.db.tasks[idx] = updated;
-    this.persist();
+    const task = this.db.tasks.find((t) => t.id === taskId && t.userId === userId);
+    if (!task) return { ok: false, error: 'Không tìm thấy tác vụ.' };
+    if (!canPauseTask(task)) {
+      return { ok: false, error: 'Không thể tạm dừng tác vụ ở trạng thái hiện tại.' };
+    }
+    const updated = applyPauseTask(task, nowIso());
+    const nextTasks = this.db.tasks.map((t) => (t.id === taskId ? updated : t));
+    this.commit({ ...this.db, tasks: nextTasks });
     return { ok: true, data: updated };
   }
 
   public resumeTask(userId: string, taskId: string): ServiceResult<PublishingTask> {
-    const idx = this.db.tasks.findIndex((t) => t.id === taskId && t.userId === userId);
-    if (idx === -1) return { ok: false, error: 'Không tìm thấy tác vụ.' };
-    const updated = applyResumeTask(this.db.tasks[idx], nowIso());
-    this.db.tasks[idx] = updated;
-    this.persist();
+    const task = this.db.tasks.find((t) => t.id === taskId && t.userId === userId);
+    if (!task) return { ok: false, error: 'Không tìm thấy tác vụ.' };
+    if (!canResumeTask(task)) {
+      return { ok: false, error: 'Chỉ có thể tiếp tục tác vụ đang ở trạng thái Tạm dừng.' };
+    }
+
+    const sub = this.getUserSubscription(userId);
+    const plan = this.getUserPlan(userId);
+    if (!isSubscriptionActive(sub) || !plan) {
+      return {
+        ok: false,
+        code: 'SUBSCRIPTION_INACTIVE',
+        error: 'Gói dịch vụ đã hết hạn. Vui lòng gia hạn trước khi tiếp tục tác vụ.',
+      };
+    }
+
+    const updated = applyResumeTask(task, nowIso());
+    if (updated.status === 'SCHEDULED') {
+      const scheduledCount = this.db.tasks.filter(
+        (t) => t.userId === userId && t.status === 'SCHEDULED'
+      ).length;
+      if (scheduledCount >= plan.maxScheduledTasks) {
+        return {
+          ok: false,
+          code: 'QUOTA_EXCEEDED',
+          error: `Đã đạt hạn mức ${plan.maxScheduledTasks} tác vụ đang chờ lịch (SCHEDULED) của gói ${plan.name}.`,
+        };
+      }
+    }
+
+    const nextTasks = this.db.tasks.map((t) => (t.id === taskId ? updated : t));
+    this.commit({ ...this.db, tasks: nextTasks });
     return { ok: true, data: updated };
   }
 
   public cancelTask(userId: string, taskId: string): ServiceResult<PublishingTask> {
-    const idx = this.db.tasks.findIndex((t) => t.id === taskId && t.userId === userId);
-    if (idx === -1) return { ok: false, error: 'Không tìm thấy tác vụ.' };
-    const updated = applyCancelTask(this.db.tasks[idx], nowIso());
-    this.db.tasks[idx] = updated;
-    this.persist();
+    const task = this.db.tasks.find((t) => t.id === taskId && t.userId === userId);
+    if (!task) return { ok: false, error: 'Không tìm thấy tác vụ.' };
+    if (!canCancelTask(task)) {
+      return { ok: false, error: 'Không thể hủy tác vụ đã kết thúc hoặc đã bị hủy.' };
+    }
+    const updated = applyCancelTask(task, nowIso());
+    const nextTasks = this.db.tasks.map((t) => (t.id === taskId ? updated : t));
+    this.commit({ ...this.db, tasks: nextTasks });
     return { ok: true, data: updated };
   }
 
@@ -927,10 +1360,22 @@ export class MockAppService
     userId: string,
     req: ConfirmTaskItemRequest
   ): ServiceResult<PublishingTask> {
-    const idx = this.db.tasks.findIndex((t) => t.id === req.taskId && t.userId === userId);
-    if (idx === -1) return { ok: false, error: 'Không tìm thấy tác vụ.' };
+    const task = this.db.tasks.find((t) => t.id === req.taskId && t.userId === userId);
+    if (!task) return { ok: false, error: 'Không tìm thấy tác vụ.' };
+
+    const targetItem = task.items.find((i) => i.id === req.itemId);
+    const ts = nowIso();
+    const check = validateUserConfirmItem(task, targetItem, new Date(ts));
+    if (!check.allowed) {
+      return {
+        ok: false,
+        code: 'INVALID_TASK_TRANSITION',
+        error: check.error ?? 'Thao tác xác nhận không hợp lệ cho trạng thái hiện tại.',
+      };
+    }
+
     const updated = applyConfirmTaskItem(
-      this.db.tasks[idx],
+      task,
       {
         itemId: req.itemId,
         status: req.status,
@@ -938,10 +1383,11 @@ export class MockAppService
         errorMessage: req.errorMessage,
         confirmationType: 'USER',
       },
-      nowIso()
+      ts
     );
-    this.db.tasks[idx] = updated;
-    this.persist();
+
+    const nextTasks = this.db.tasks.map((t) => (t.id === req.taskId ? updated : t));
+    this.commit({ ...this.db, tasks: nextTasks });
     return { ok: true, data: updated };
   }
 
@@ -950,28 +1396,63 @@ export class MockAppService
     taskId: string,
     itemId: string
   ): ServiceResult<PublishingTask> {
-    const idx = this.db.tasks.findIndex((t) => t.id === taskId && t.userId === userId);
-    if (idx === -1) return { ok: false, error: 'Không tìm thấy tác vụ.' };
-    const item = this.db.tasks[idx].items.find((i) => i.id === itemId);
-    if (!item || item.status !== 'FAILED') {
-      return { ok: false, error: 'Chỉ có thể thử lại các mục đang ở trạng thái Thất bại.' };
+    const task = this.db.tasks.find((t) => t.id === taskId && t.userId === userId);
+    if (!task) return { ok: false, error: 'Không tìm thấy tác vụ.' };
+
+    const sub = this.getUserSubscription(userId);
+    if (!isSubscriptionActive(sub)) {
+      return {
+        ok: false,
+        code: 'SUBSCRIPTION_INACTIVE',
+        error: 'Gói dịch vụ đã hết hạn. Vui lòng gia hạn để thử lại mục thất bại.',
+      };
     }
-    const updated = applyRetryTaskItem(this.db.tasks[idx], itemId, nowIso());
-    this.db.tasks[idx] = updated;
-    this.persist();
+
+    const item = task.items.find((i) => i.id === itemId);
+    const check = validateRetryItem(task, item);
+    if (!check.allowed) {
+      return {
+        ok: false,
+        code: 'INVALID_TASK_TRANSITION',
+        error: check.error ?? 'Không thể thử lại mục này.',
+      };
+    }
+
+    const updated = applyRetryTaskItem(task, itemId, nowIso());
+    const nextTasks = this.db.tasks.map((t) => (t.id === taskId ? updated : t));
+    this.commit({ ...this.db, tasks: nextTasks });
     return { ok: true, data: updated };
   }
 
   public retryFailedItems(userId: string, taskId: string): ServiceResult<PublishingTask> {
-    const idx = this.db.tasks.findIndex((t) => t.id === taskId && t.userId === userId);
-    if (idx === -1) return { ok: false, error: 'Không tìm thấy tác vụ.' };
-    const hasFailed = this.db.tasks[idx].items.some((i) => i.status === 'FAILED');
+    const task = this.db.tasks.find((t) => t.id === taskId && t.userId === userId);
+    if (!task) return { ok: false, error: 'Không tìm thấy tác vụ.' };
+
+    const sub = this.getUserSubscription(userId);
+    if (!isSubscriptionActive(sub)) {
+      return {
+        ok: false,
+        code: 'SUBSCRIPTION_INACTIVE',
+        error: 'Gói dịch vụ đã hết hạn. Vui lòng gia hạn để thử lại các mục thất bại.',
+      };
+    }
+
+    if (task.status === 'PAUSED' || task.status === 'CANCELLED' || task.status === 'SCHEDULED') {
+      return {
+        ok: false,
+        code: 'INVALID_TASK_TRANSITION',
+        error: 'Không thể thử lại khi tác vụ đang tạm dừng, đã hủy hoặc chưa đến lịch.',
+      };
+    }
+
+    const hasFailed = task.items.some((i) => i.status === 'FAILED');
     if (!hasFailed) {
       return { ok: false, error: 'Tác vụ này không có mục thất bại nào để thử lại.' };
     }
-    const updated = applyRetryAllFailedItems(this.db.tasks[idx], nowIso());
-    this.db.tasks[idx] = updated;
-    this.persist();
+
+    const updated = applyRetryAllFailedItems(task, nowIso());
+    const nextTasks = this.db.tasks.map((t) => (t.id === taskId ? updated : t));
+    this.commit({ ...this.db, tasks: nextTasks });
     return { ok: true, data: updated };
   }
 
@@ -993,6 +1474,7 @@ export class MockAppService
     if (plan && isSubscriptionActive(sub) && activeAccounts.length >= plan.maxFacebookAccounts) {
       return {
         ok: false,
+        code: 'QUOTA_EXCEEDED',
         error: `Đã đạt giới hạn ${plan.maxFacebookAccounts} hồ sơ Facebook của gói ${plan.name}.`,
       };
     }
@@ -1010,8 +1492,8 @@ export class MockAppService
       createdAt: ts,
       updatedAt: ts,
     };
-    this.db.accounts.unshift(account);
-    this.persist();
+
+    this.commit({ ...this.db, accounts: [account, ...this.db.accounts] });
     return { ok: true, data: account };
   }
 
@@ -1031,6 +1513,7 @@ export class MockAppService
     if (plan && isSubscriptionActive(sub) && activeAccounts.length >= plan.maxFacebookAccounts) {
       return {
         ok: false,
+        code: 'QUOTA_EXCEEDED',
         error: `Đã đạt giới hạn ${plan.maxFacebookAccounts} hồ sơ Facebook của gói ${plan.name}.`,
       };
     }
@@ -1063,9 +1546,11 @@ export class MockAppService
       updatedAt: ts,
     };
 
-    this.db.accounts.unshift(demoAccount);
-    this.db.pages.unshift(demoPage);
-    this.persist();
+    this.commit({
+      ...this.db,
+      accounts: [demoAccount, ...this.db.accounts],
+      pages: [demoPage, ...this.db.pages],
+    });
     return { ok: true, data: { account: demoAccount, pages: [demoPage] } };
   }
 
@@ -1073,26 +1558,31 @@ export class MockAppService
     userId: string,
     accountId: string
   ): ServiceResult<FacebookAccount> {
-    const account = this.db.accounts.find((a) => a.id === accountId && a.userId === userId);
-    if (!account) return { ok: false, error: 'Không tìm thấy tài khoản.' };
+    const existing = this.db.accounts.find((a) => a.id === accountId && a.userId === userId);
+    if (!existing) return { ok: false, error: 'Không tìm thấy tài khoản.' };
 
     // Truthful refresh: never forces UNVERIFIED/DISCONNECTED/EXPIRED into CONNECTED
-    account.updatedAt = nowIso();
-    this.persist();
-    return { ok: true, data: { ...account } };
+    const updated: FacebookAccount = { ...existing, updatedAt: nowIso() };
+    const nextAccounts = this.db.accounts.map((a) => (a.id === accountId ? updated : a));
+    this.commit({ ...this.db, accounts: nextAccounts });
+    return { ok: true, data: updated };
   }
 
   public disconnectAccount(
     userId: string,
     accountId: string
   ): ServiceResult<FacebookAccount> {
-    const account = this.db.accounts.find((a) => a.id === accountId && a.userId === userId);
-    if (!account) return { ok: false, error: 'Không tìm thấy tài khoản.' };
+    const existing = this.db.accounts.find((a) => a.id === accountId && a.userId === userId);
+    if (!existing) return { ok: false, error: 'Không tìm thấy tài khoản.' };
 
-    account.status = 'DISCONNECTED';
-    account.updatedAt = nowIso();
-    this.persist();
-    return { ok: true, data: { ...account } };
+    const updated: FacebookAccount = {
+      ...existing,
+      status: 'DISCONNECTED',
+      updatedAt: nowIso(),
+    };
+    const nextAccounts = this.db.accounts.map((a) => (a.id === accountId ? updated : a));
+    this.commit({ ...this.db, accounts: nextAccounts });
+    return { ok: true, data: updated };
   }
 
   public syncPages(
@@ -1136,8 +1626,7 @@ export class MockAppService
       revokedAt: null,
       createdAt: ts,
     };
-    this.db.devices.unshift(device);
-    this.persist();
+    this.commit({ ...this.db, devices: [device, ...this.db.devices] });
     return { ok: true, data: device };
   }
 
@@ -1145,27 +1634,30 @@ export class MockAppService
     userId: string,
     deviceId: string
   ): ServiceResult<ExtensionDevice> {
-    const device = this.db.devices.find((d) => d.id === deviceId && d.userId === userId);
-    if (!device) return { ok: false, error: 'Không tìm thấy thiết bị.' };
-    if (computeDeviceConnectionStatus(device) === 'REVOKED') {
+    const existing = this.db.devices.find((d) => d.id === deviceId && d.userId === userId);
+    if (!existing) return { ok: false, error: 'Không tìm thấy thiết bị.' };
+    if (computeDeviceConnectionStatus(existing) === 'REVOKED') {
       return {
         ok: false,
         error: 'Thiết bị này đã bị thu hồi quyền truy cập và không thể kết nối lại.',
       };
     }
-    device.lastSeenAt = nowIso();
-    this.persist();
-    return { ok: true, data: { ...device } };
+    const updated: ExtensionDevice = { ...existing, lastSeenAt: nowIso() };
+    const nextDevices = this.db.devices.map((d) => (d.id === deviceId ? updated : d));
+    this.commit({ ...this.db, devices: nextDevices });
+    return { ok: true, data: updated };
   }
 
   public revokeDevice(userId: string, deviceId: string): ServiceResult<ExtensionDevice> {
-    const device = this.db.devices.find((d) => d.id === deviceId && d.userId === userId);
-    if (!device) return { ok: false, error: 'Không tìm thấy thiết bị.' };
-    if (!device.revokedAt) {
-      device.revokedAt = nowIso();
-      this.persist();
+    const existing = this.db.devices.find((d) => d.id === deviceId && d.userId === userId);
+    if (!existing) return { ok: false, error: 'Không tìm thấy thiết bị.' };
+    if (existing.revokedAt) {
+      return { ok: true, data: existing };
     }
-    return { ok: true, data: { ...device } };
+    const updated: ExtensionDevice = { ...existing, revokedAt: nowIso() };
+    const nextDevices = this.db.devices.map((d) => (d.id === deviceId ? updated : d));
+    this.commit({ ...this.db, devices: nextDevices });
+    return { ok: true, data: updated };
   }
 
   // ==================== BILLING & PAYMENT ORDERS ====================
@@ -1180,7 +1672,7 @@ export class MockAppService
     }
     const ts = nowIso();
     const amountVnd =
-      req.billingPeriod === 'YEARLY' ? plan.priceYearlyVnd : plan.priceMonthlyVnd;
+      req.billingPeriod === 'YEARLY' ? plan.yearlyPriceVnd : plan.monthlyPriceVnd;
     const shortCode = generateId().replace(/-/g, '').slice(0, 6).toUpperCase();
     const order: PaymentOrder = {
       id: generateId(),
@@ -1197,8 +1689,7 @@ export class MockAppService
       createdAt: ts,
       updatedAt: ts,
     };
-    this.db.orders.unshift(order);
-    this.persist();
+    this.commit({ ...this.db, orders: [order, ...this.db.orders] });
     return { ok: true, data: order };
   }
 
@@ -1207,27 +1698,36 @@ export class MockAppService
    * Only checks expiry or returns current status.
    */
   public checkOrderStatus(userId: string, orderId: string): ServiceResult<PaymentOrder> {
-    const order = this.db.orders.find((o) => o.id === orderId && o.userId === userId);
-    if (!order) return { ok: false, error: 'Không tìm thấy đơn hàng.' };
+    const existing = this.db.orders.find((o) => o.id === orderId && o.userId === userId);
+    if (!existing) return { ok: false, error: 'Không tìm thấy đơn hàng.' };
 
-    if (order.status === 'PENDING' && new Date(order.expiresAt).getTime() <= Date.now()) {
-      order.status = 'EXPIRED';
-      order.updatedAt = nowIso();
-      this.persist();
+    if (existing.status === 'PENDING' && new Date(existing.expiresAt).getTime() <= Date.now()) {
+      const expired: PaymentOrder = {
+        ...existing,
+        status: 'EXPIRED',
+        updatedAt: nowIso(),
+      };
+      const nextOrders = this.db.orders.map((o) => (o.id === orderId ? expired : o));
+      this.commit({ ...this.db, orders: nextOrders });
+      return { ok: true, data: expired };
     }
-    return { ok: true, data: { ...order } };
+    return { ok: true, data: existing };
   }
 
   public cancelPaymentOrder(userId: string, orderId: string): ServiceResult<PaymentOrder> {
-    const order = this.db.orders.find((o) => o.id === orderId && o.userId === userId);
-    if (!order) return { ok: false, error: 'Không tìm thấy đơn hàng.' };
-    if (order.status !== 'PENDING') {
+    const existing = this.db.orders.find((o) => o.id === orderId && o.userId === userId);
+    if (!existing) return { ok: false, error: 'Không tìm thấy đơn hàng.' };
+    if (existing.status !== 'PENDING') {
       return { ok: false, error: 'Chỉ có thể hủy đơn hàng đang chờ thanh toán.' };
     }
-    order.status = 'CANCELLED';
-    order.updatedAt = nowIso();
-    this.persist();
-    return { ok: true, data: { ...order } };
+    const cancelled: PaymentOrder = {
+      ...existing,
+      status: 'CANCELLED',
+      updatedAt: nowIso(),
+    };
+    const nextOrders = this.db.orders.map((o) => (o.id === orderId ? cancelled : o));
+    this.commit({ ...this.db, orders: nextOrders });
+    return { ok: true, data: cancelled };
   }
 
   // ==================== ADMIN ====================
@@ -1254,25 +1754,35 @@ export class MockAppService
       return { ok: false, error: 'Không thể tự hạ quyền quản trị của chính mình.' };
     }
 
-    if (req.fullName !== undefined && req.fullName.trim().length >= 2) {
-      target.fullName = req.fullName.trim();
-    }
-    if (req.role) target.role = req.role;
-    if (req.status) target.status = req.status;
-    target.updatedAt = nowIso();
+    const ts = nowIso();
+    const updated: User = {
+      ...target,
+      displayName:
+        req.displayName !== undefined && req.displayName.trim().length >= 2
+          ? req.displayName.trim()
+          : target.displayName,
+      role: req.role ?? target.role,
+      status: req.status ?? target.status,
+      updatedAt: ts,
+    };
 
-    this.db.auditLogs.unshift({
+    const nextUsers = this.db.users.map((u) => (u.id === target.id ? updated : u));
+    const auditLog = {
       id: generateId(),
       actorUserId: adminUserId,
       action: 'ADMIN_UPDATE_USER',
       entityType: 'users',
       entityId: target.id,
-      metadata: { role: target.role, status: target.status },
-      createdAt: nowIso(),
-    });
+      metadata: { role: updated.role, status: updated.status, displayName: updated.displayName },
+      createdAt: ts,
+    };
 
-    this.persist();
-    return { ok: true, data: { ...target } };
+    this.commit({
+      ...this.db,
+      users: nextUsers,
+      auditLogs: [auditLog, ...this.db.auditLogs],
+    });
+    return { ok: true, data: updated };
   }
 
   public upsertPlan(adminUserId: string, req: UpsertPlanRequest): ServiceResult<Plan> {
@@ -1284,13 +1794,13 @@ export class MockAppService
     if (!code || !name) {
       return { ok: false, error: 'Vui lòng nhập đầy đủ mã gói và tên gói.' };
     }
-    if (req.priceMonthlyVnd < 0 || req.priceYearlyVnd < 0) {
+    if (req.monthlyPriceVnd < 0 || req.yearlyPriceVnd < 0) {
       return { ok: false, error: 'Giá gói không được âm.' };
     }
     if (
       req.maxFacebookAccounts < 1 ||
-      req.maxGroups < 1 ||
-      req.maxScheduledTasksPerDay < 1
+      req.maxSavedGroups < 1 ||
+      req.maxScheduledTasks < 1
     ) {
       return { ok: false, error: 'Các hạn mức gói phải lớn hơn hoặc bằng 1.' };
     }
@@ -1302,20 +1812,44 @@ export class MockAppService
       if (this.db.plans.some((p) => p.code === code && p.id !== req.id)) {
         return { ok: false, error: `Mã gói "${code}" đã tồn tại.` };
       }
-      existing.code = code;
-      existing.name = name;
-      existing.description = req.description.trim();
-      existing.priceMonthlyVnd = Math.round(req.priceMonthlyVnd);
-      existing.priceYearlyVnd = Math.round(req.priceYearlyVnd);
-      existing.maxFacebookAccounts = Math.floor(req.maxFacebookAccounts);
-      existing.maxGroups = Math.floor(req.maxGroups);
-      existing.maxScheduledTasksPerDay = Math.floor(req.maxScheduledTasksPerDay);
-      existing.features = req.features.map((f) => f.trim()).filter(Boolean);
-      existing.isActive = req.isActive;
-      existing.updatedAt = ts;
 
-      this.persist();
-      return { ok: true, data: { ...existing } };
+      const updated: Plan = {
+        ...existing,
+        code,
+        name,
+        monthlyPriceVnd: Math.round(req.monthlyPriceVnd),
+        yearlyPriceVnd: Math.round(req.yearlyPriceVnd),
+        maxFacebookAccounts: Math.floor(req.maxFacebookAccounts),
+        maxSavedGroups: Math.floor(req.maxSavedGroups),
+        maxScheduledTasks: Math.floor(req.maxScheduledTasks),
+        isActive: req.isActive,
+        updatedAt: ts,
+      };
+      const nextPlans = this.db.plans.map((p) => (p.id === req.id ? updated : p));
+      const auditLog = {
+        id: generateId(),
+        actorUserId: adminUserId,
+        action: 'ADMIN_UPDATE_PLAN',
+        entityType: 'plans',
+        entityId: updated.id,
+        metadata: {
+          code: updated.code,
+          monthlyPriceVnd: updated.monthlyPriceVnd,
+          yearlyPriceVnd: updated.yearlyPriceVnd,
+          maxFacebookAccounts: updated.maxFacebookAccounts,
+          maxSavedGroups: updated.maxSavedGroups,
+          maxScheduledTasks: updated.maxScheduledTasks,
+          isActive: updated.isActive,
+        },
+        createdAt: ts,
+      };
+
+      this.commit({
+        ...this.db,
+        plans: nextPlans,
+        auditLogs: [auditLog, ...this.db.auditLogs],
+      });
+      return { ok: true, data: updated };
     }
 
     if (this.db.plans.some((p) => p.code === code)) {
@@ -1326,19 +1860,35 @@ export class MockAppService
       id: generateId(),
       code,
       name,
-      description: req.description.trim(),
-      priceMonthlyVnd: Math.round(req.priceMonthlyVnd),
-      priceYearlyVnd: Math.round(req.priceYearlyVnd),
+      monthlyPriceVnd: Math.round(req.monthlyPriceVnd),
+      yearlyPriceVnd: Math.round(req.yearlyPriceVnd),
       maxFacebookAccounts: Math.floor(req.maxFacebookAccounts),
-      maxGroups: Math.floor(req.maxGroups),
-      maxScheduledTasksPerDay: Math.floor(req.maxScheduledTasksPerDay),
-      features: req.features.map((f) => f.trim()).filter(Boolean),
+      maxSavedGroups: Math.floor(req.maxSavedGroups),
+      maxScheduledTasks: Math.floor(req.maxScheduledTasks),
       isActive: req.isActive,
       createdAt: ts,
       updatedAt: ts,
     };
-    this.db.plans.push(newPlan);
-    this.persist();
+
+    const auditLog = {
+      id: generateId(),
+      actorUserId: adminUserId,
+      action: 'ADMIN_CREATE_PLAN',
+      entityType: 'plans',
+      entityId: newPlan.id,
+      metadata: {
+        code: newPlan.code,
+        monthlyPriceVnd: newPlan.monthlyPriceVnd,
+        yearlyPriceVnd: newPlan.yearlyPriceVnd,
+      },
+      createdAt: ts,
+    };
+
+    this.commit({
+      ...this.db,
+      plans: [...this.db.plans, newPlan],
+      auditLogs: [auditLog, ...this.db.auditLogs],
+    });
     return { ok: true, data: newPlan };
   }
 
@@ -1351,54 +1901,131 @@ export class MockAppService
 
     const order = this.db.orders.find((o) => o.id === req.orderId);
     if (!order) return { ok: false, error: 'Không tìm thấy đơn hàng.' };
+
+    // Prevent double-confirmation
+    if (order.status === 'PAID') {
+      return {
+        ok: false,
+        code: 'ORDER_ALREADY_PAID',
+        error: 'Đơn hàng này đã được xác nhận thanh toán trước đó và không thể xác nhận lại.',
+      };
+    }
     if (order.status !== 'PENDING') {
-      return { ok: false, error: 'Chỉ có thể xác nhận đơn hàng đang ở trạng thái Chờ thanh toán.' };
+      return {
+        ok: false,
+        code: 'ORDER_NOT_PENDING',
+        error: 'Chỉ có thể xác nhận đơn hàng đang ở trạng thái Chờ thanh toán (PENDING).',
+      };
     }
 
-    const ts = nowIso();
-    order.status = 'PAID';
-    order.paidAt = ts;
-    order.providerReference = req.providerReference?.trim() || `ADMIN-DEMO-${Date.now()}`;
-    order.updatedAt = ts;
+    const now = new Date();
+    const ts = now.toISOString();
 
-    // Deactivate old active subscriptions for that user and activate new one
-    for (const sub of this.db.subscriptions) {
-      if (sub.userId === order.userId && sub.status === 'ACTIVE') {
-        sub.status = 'CANCELLED';
-        sub.updatedAt = ts;
-      }
+    // Reject expired orders and transition them to EXPIRED
+    if (new Date(order.expiresAt).getTime() <= now.getTime()) {
+      const expiredOrder: PaymentOrder = {
+        ...order,
+        status: 'EXPIRED',
+        updatedAt: ts,
+      };
+      const nextOrders = this.db.orders.map((o) => (o.id === order.id ? expiredOrder : o));
+      this.commit({ ...this.db, orders: nextOrders });
+      return {
+        ok: false,
+        code: 'ORDER_EXPIRED',
+        error: 'Đơn hàng đã hết hạn thanh toán (expiresAt <= hiện tại) và không thể xác nhận.',
+      };
     }
 
+    const currentSub = this.getUserSubscription(order.userId);
+    const intent = classifyPaymentOrderIntent(currentSub, order.planId, now);
     const durationDays = order.billingPeriod === 'YEARLY' ? 365 : 30;
-    const subscription: Subscription = {
-      id: generateId(),
-      userId: order.userId,
-      planId: order.planId,
-      billingPeriod: order.billingPeriod,
-      status: 'ACTIVE',
-      startsAt: ts,
-      endsAt: addDaysIso(durationDays),
-      createdAt: ts,
+
+    // Require explicit DEMO acknowledgement for unapproved mid-term CHANGE_PLAN policy
+    if (intent === 'CHANGE_PLAN' && !req.acknowledgeUnapprovedPlanChangePolicy) {
+      return {
+        ok: false,
+        code: 'PLAN_CHANGE_POLICY_CONFIRMATION_REQUIRED',
+        error:
+          'Chính sách đổi gói khi gói cũ còn hạn (bù trừ/cộng dồn) đang chờ chủ sản phẩm phê duyệt. Vui lòng đánh dấu xác nhận quy tắc tạm thời DEMO trước khi tiếp tục.',
+      };
+    }
+
+    const paidOrder: PaymentOrder = {
+      ...order,
+      status: 'PAID',
+      paidAt: ts,
+      providerReference: req.providerReference?.trim() || `ADMIN-DEMO-${Date.now()}`,
       updatedAt: ts,
     };
-    this.db.subscriptions.unshift(subscription);
+    const nextOrders = this.db.orders.map((o) => (o.id === order.id ? paidOrder : o));
 
-    this.db.auditLogs.unshift({
+    let resultingSub: Subscription;
+    let nextSubscriptions: Subscription[];
+    const previousExpiresAt = currentSub?.expiresAt ?? null;
+
+    if (intent === 'RENEWAL' && currentSub && isSubscriptionActive(currentSub, now)) {
+      // Preserve remaining active time on renewal of the same plan
+      const extendedExpiresAt = addDaysIso(durationDays, new Date(currentSub.expiresAt));
+      resultingSub = {
+        ...currentSub,
+        billingPeriod: order.billingPeriod,
+        expiresAt: extendedExpiresAt,
+        status: 'ACTIVE',
+        updatedAt: ts,
+      };
+      nextSubscriptions = this.db.subscriptions.map((s) =>
+        s.id === currentSub.id ? resultingSub : s
+      );
+    } else {
+      // PURCHASE or CHANGE_PLAN (or renewing an already-expired subscription)
+      const deactivated = this.db.subscriptions.map((s) =>
+        s.userId === order.userId && s.status === 'ACTIVE'
+          ? { ...s, status: 'CANCELLED' as const, updatedAt: ts }
+          : s
+      );
+      resultingSub = {
+        id: generateId(),
+        userId: order.userId,
+        planId: order.planId,
+        billingPeriod: order.billingPeriod,
+        status: 'ACTIVE',
+        startsAt: ts,
+        expiresAt: addDaysIso(durationDays, now),
+        createdAt: ts,
+        updatedAt: ts,
+      };
+      nextSubscriptions = [resultingSub, ...deactivated];
+    }
+
+    const auditLog = {
       id: generateId(),
       actorUserId: adminUserId,
       action: 'ADMIN_CONFIRM_PAYMENT_DEMO',
       entityType: 'payment_orders',
-      entityId: order.id,
+      entityId: paidOrder.id,
       metadata: {
-        orderCode: order.orderCode,
-        amountVnd: order.amountVnd,
-        providerReference: order.providerReference,
+        intent,
+        orderCode: paidOrder.orderCode,
+        amountVnd: paidOrder.amountVnd,
+        providerReference: paidOrder.providerReference,
+        previousExpiresAt,
+        newExpiresAt: resultingSub.expiresAt,
+        ...(intent === 'CHANGE_PLAN'
+          ? { planChangePolicyApplied: 'DEMO_IMMEDIATE_REPLACE_PENDING_OWNER_APPROVAL' }
+          : {}),
       },
       createdAt: ts,
+    };
+
+    this.commit({
+      ...this.db,
+      orders: nextOrders,
+      subscriptions: nextSubscriptions,
+      auditLogs: [auditLog, ...this.db.auditLogs],
     });
 
-    this.persist();
-    return { ok: true, data: { order: { ...order }, subscription } };
+    return { ok: true, data: { order: paidOrder, subscription: resultingSub } };
   }
 }
 

@@ -61,9 +61,12 @@ export interface SubscriptionUsageSummary {
   accountsLimit: number;
   groupsUsed: number;
   groupsLimit: number;
-  scheduledTodayUsed: number;
-  scheduledTodayLimit: number;
+  /** Concurrent tasks currently in status === 'SCHEDULED' (NOT daily post limit) */
+  scheduledTasksUsed: number;
+  scheduledTasksLimit: number;
 }
+
+export type PaymentOrderIntent = 'PURCHASE' | 'RENEWAL' | 'CHANGE_PLAN';
 
 export interface AdminUserRowViewModel {
   user: User;

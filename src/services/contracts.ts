@@ -10,6 +10,7 @@ import type {
   ForgotPasswordRequest,
   LoginRequest,
   RegisterRequest,
+  RescheduleTaskRequest,
   ResetPasswordRequest,
   SavePostTemplateRequest,
   ServiceResult,
@@ -33,7 +34,6 @@ import type {
 
 /**
  * Service layer contracts mapped 1-to-1 to the planned REST API backend.
- * In prototype mode these are implemented by MockAppService; in production they can be swapped for HTTP fetch adapters.
  */
 
 export interface AuthServiceContract {
@@ -111,6 +111,10 @@ export interface GroupServiceContract {
 export interface TaskServiceContract {
   /** POST /api/tasks */
   createTask(userId: string, req: CreatePublishingTaskRequest): ServiceResult<PublishingTask>;
+  /** PATCH /api/tasks/:taskId/schedule */
+  rescheduleTask(userId: string, req: RescheduleTaskRequest): ServiceResult<PublishingTask>;
+  /** DEMO scheduler event: marks a due SCHEDULED task ready (checks subscription validity) */
+  triggerDueScheduledTaskDemo(userId: string, taskId: string): ServiceResult<PublishingTask>;
   /** POST /api/tasks/:taskId/pause */
   pauseTask(userId: string, taskId: string): ServiceResult<PublishingTask>;
   /** POST /api/tasks/:taskId/resume */

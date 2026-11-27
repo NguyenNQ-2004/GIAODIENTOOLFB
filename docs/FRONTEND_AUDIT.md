@@ -1,10 +1,32 @@
-# Frontend Audit & Refactor Log
+# Frontend Audit & Refactor Log (V1 → V3)
 
-## P0 Defects Identified & Resolved
-1. **Out-of-scope automation/cookie features removed**: Removed `cookieDaysLeft`, `humanEmulation`, `minDelaySec`, `maxDelaySec`, `dailyLimitPerAccount`, `groupSyncHours`, `pingMs`, `ExtensionSettings`, Anti-Checkpoint / Human Typing / Fast Paste / Terminal logs / Cookie Live / fabricated reach & checkpoint percentages.
-2. **Routing & Auth Guard fixed**: Replaced in-memory tab switcher with `react-router-dom` (`BrowserRouter`), `AuthGuard`, `AdminGuard`, and 4 auth routes (`/login`, `/register`, `/forgot-password`, `/reset-password`). Removed pre-filled passwords and auto-login bypass; added explicit DEMO login options and strict per-user data isolation on logout/login.
-3. **Database contract alignment**: Split `src/types/app.ts` into `domain.ts`, `api.ts`, `viewModels.ts` matching all 19 PostgreSQL tables. Replaced single `collectionId` with many-to-many `GroupCollectionItem`; replaced `mediaCount` with full `MediaAttachment[]`; removed stored `completedCount`/`totalCount` in favor of `getTaskProgress(items)`.
-4. **Post Composer fixes**: Enabled image-only and link-only posts; removed fabricated UID/`12000` members and pre-filled Add Group fields; separated `activeSlotNumber` from `selectedDraftIds`; implemented real file-picker RFC-4180 CSV import with preview and formula-injection-safe export; filtered Fanpages by selected Meta OAuth account and blocked `canPublish=false`; replaced hardcoded `2024-10-24` schedule with dynamic future GMT+7 default; added explicit `(post, destination)` confirmation modal with `idempotencyKey` double-submit guard and `URL.revokeObjectURL` cleanup.
-5. **Task State Machine & Dashboard fixes**: Implemented pure `taskStatus.ts` covering all 10 `TaskStatus` and 7 `TaskItemStatus` values; fixed Pause (`PAUSED`), Per-Item Confirm, Retry eligibility + `attemptCount`, Cancel (`PROCESSING -> NEEDS_REVIEW`, preserving history); made Dashboard `dateFilter` real; replaced hardcoded Oct 2024 calendar & `+17`/`+4` KPI offsets with real dynamic current-month calendar and computed metrics; made `TaskDrawer` reactive by `taskId`.
-6. **Accounts, Pricing, Admin & Extension Preview fixes**: Stopped `refreshAccountStatus` from forcing `CONNECTED`; changed Disconnect to set `DISCONNECTED` instead of deleting; blocked revoked devices from reconnecting; stopped customer `checkOrderStatus` from auto-marking `PAID`; replaced real-looking bank details with placeholder QR DEMO; computed countdown from `expiresAt`; fixed exact `0` usage and empty-orders handling; restricted Admin to 4 tabs (`overview`, `users`, `plans`, `payments`), blocked admin self-lock, removed permanent user delete, synced Plan CRUD live to Pricing; refactored Extension Popup Preview to 385×560px with 9 scenarios and strictly legal actions.
-7. **Dependency cleanup**: Removed unused `@google/genai`, `express`, `dotenv`, `motion`, `@types/express` from `package.json`; added `react-router-dom`.
+## V3 Acceptance Fixes (Final Handoff Baseline)
+1. **P0 Reactive State Management (`AppContext.tsx` & `mockService.ts`)**:
+   - Replaced mutable in-place `this.db` updates with structural-sharing immutable snapshots (`ReactiveStoreSnapshot`) + `subscribe()` consumed via React 19 `useSyncExternalStore`.
+   - Slice-level `useMemo` dependencies (`[db.groups, userId]`, `[db.tasks, userId]`, `[db.plans]`, etc.) ensure every group, collection, task, item confirmation, plan price edit, and DEMO payment confirmation updates UI & open `TaskDrawer` instantaneously without browser refresh or infinite loops.
+2. **P0 Canonical Database Contract Alignment**:
+   - Standardized `User.displayName` (removed `fullName`), `Subscription.expiresAt` (removed `endsAt`), and `Plan` (`monthlyPriceVnd`, `yearlyPriceVnd`, `maxFacebookAccounts`, `maxSavedGroups`, `maxScheduledTasks` — removed unapproved `description` & `features` columns).
+   - Added `localStorage` schema v3 envelope (`fbpostpro_demo_db_v3`) with automatic migration/reset from legacy `v1`/`v2`/corrupt storage and a dismissible banner (`schemaMigrationNotice`).
+3. **P0 Official Subscription Quota Semantics**:
+   - Replaced erroneous `maxScheduledTasksPerDay` / `scheduledTodayUsed` with concurrent `SCHEDULED` task quota (`maxScheduledTasks` / `scheduledTasksUsed`).
+   - Immediate tasks do not consume `maxScheduledTasks`; cancelling or starting a scheduled task frees the slot; active subscription is verified on create, resume, retry, reschedule, and due trigger.
+4. **P0 Post Composer Selection & Per-Draft Destination Mapping**:
+   - Fixed `TEST-34`: removed auto-reselect `useEffect`, initialized selection once per user, and ensured unchecked drafts never publish.
+   - Fixed `TEST-35`: replaced shared group/page checkboxes with explicit per-draft mapping (`groupIdsByDraftId`, `pageIdsByDraftId`) so Draft 1 → Group A and Draft 2 → Group B produces exactly 2 items (never implicit Cartesian product), plus an explicit optional "Áp dụng đích của bài này cho các bài đang chọn" button.
+5. **P0 Persistent Media Lifecycle (`mediaStorage.ts` & `MediaPreview.tsx`)**:
+   - Stored uploaded `File`/`Blob` binaries in IndexedDB (`fbpostpro_demo_media_v1`) keyed by `media.id`; stopped persisting ephemeral `blob:` URLs in `localStorage` and stopped revoking object URLs on unmount.
+   - Verified `isMediaReferenced(mediaId)` across drafts, saved posts, and task item snapshots before deleting orphan blobs; rendered honest `"Tệp không còn khả dụng"` fallback when missing.
+6. **P0 Strict Task State Machine & Extension Selection**:
+   - Enforced transition validation in both `taskStatus.ts` and `mockService.ts` (rejecting `USER` confirms on `META_PAGE_API`, terminal overwrites, future/paused/cancelled confirms, and `NEEDS_REVIEW` retries).
+   - Removed `tasks[0]`/`items[0]` fallback from `ExtensionPopupPage.tsx` via strict `getEligibleExtensionSelection`.
+   - Added `rescheduleTask`, `triggerDueScheduledTaskDemo`, and `"Quá giờ lịch"` indicator for overdue `SCHEDULED` tasks.
+7. **P0 Payment Order Safety & Renewal Preservation**:
+   - Preserved remaining active time on `RENEWAL` (extending from `currentSub.expiresAt`), rejected already-`PAID` and `EXPIRED` orders, and added explicit policy acknowledgment guard for mid-term `CHANGE_PLAN` pending owner decision (`docs/OPEN_QUESTIONS.md`).
+8. **P1 Environment / DEMO Boundary & Archival Hygiene**:
+   - Centralized `IS_DEMO_MODE` / `IS_DEV_OR_DEMO` in `src/config/demoConfig.ts` to gate DEMO badges, quick logins, Reset DEMO, Admin DEMO confirm, Meta OAuth DEMO, and `/extension-preview`.
+   - Archived all 8 static `/design/*.html` Stitch exports with header comments, top banners, and `/design/README.md`.
+
+## Earlier V1/V2 Resolved Defects (Preserved)
+- Removed out-of-scope cookie/human-emulation/delay/terminal features.
+- Implemented `BrowserRouter` + `AuthGuard` + `AdminGuard` + user data isolation on logout/login.
+- Implemented RFC-4180 CSV import preview & formula-injection-safe export, GMT+7 scheduling, dynamic calendar, and strictly 4 Admin tabs.

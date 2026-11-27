@@ -7,8 +7,7 @@ import type {
   PublishingTask,
   Subscription,
 } from '../types/domain';
-import type { SubscriptionUsageSummary } from '../types/viewModels';
-import { getVietnamDateKey, getVietnamTodayKey } from './dateTime';
+import type { PaymentOrderIntent, SubscriptionUsageSummary } from '../types/viewModels';
 
 export const DEVICE_ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -16,7 +15,6 @@ export function generateId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
-  // Safe fallback for environments without randomUUID
   return `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
@@ -58,11 +56,35 @@ export function isSubscriptionActive(
 ): boolean {
   if (!subscription) return false;
   if (subscription.status !== 'ACTIVE') return false;
-  const endsMs = new Date(subscription.endsAt).getTime();
-  if (Number.isNaN(endsMs)) return false;
-  return endsMs > now.getTime();
+  const expiresMs = new Date(subscription.expiresAt).getTime();
+  if (Number.isNaN(expiresMs)) return false;
+  return expiresMs > now.getTime();
 }
 
+export function classifyPaymentOrderIntent(
+  currentSubscription: Subscription | null | undefined,
+  targetPlanId: string,
+  now: Date = new Date()
+): PaymentOrderIntent {
+  if (!currentSubscription || !isSubscriptionActive(currentSubscription, now)) {
+    if (currentSubscription && currentSubscription.planId === targetPlanId) {
+      return 'RENEWAL';
+    }
+    return 'PURCHASE';
+  }
+  if (currentSubscription.planId === targetPlanId) {
+    return 'RENEWAL';
+  }
+  return 'CHANGE_PLAN';
+}
+
+/**
+ * Official quota semantics:
+ * - maxFacebookAccounts: active Facebook profiles (status !== 'DISCONNECTED')
+ * - maxSavedGroups: saved groups count
+ * - maxScheduledTasks: concurrent tasks currently in status === 'SCHEDULED'
+ *   (NOT daily post count; immediate tasks do NOT consume this quota; cancelling frees it).
+ */
 export function computeSubscriptionUsage(params: {
   subscription: Subscription | null;
   plan: Plan | null;
@@ -75,15 +97,15 @@ export function computeSubscriptionUsage(params: {
   const active = isSubscriptionActive(params.subscription, now);
   const daysRemaining =
     active && params.subscription
-      ? Math.max(0, Math.ceil((new Date(params.subscription.endsAt).getTime() - now.getTime()) / 86_400_000))
+      ? Math.max(
+          0,
+          Math.ceil(
+            (new Date(params.subscription.expiresAt).getTime() - now.getTime()) / 86_400_000
+          )
+        )
       : 0;
 
-  const todayKey = getVietnamTodayKey(now);
-  const scheduledTodayUsed = params.tasks.filter((t) => {
-    const refTime = t.scheduledAt ?? t.createdAt;
-    return getVietnamDateKey(refTime) === todayKey && t.status !== 'CANCELLED';
-  }).length;
-
+  const scheduledTasksUsed = params.tasks.filter((t) => t.status === 'SCHEDULED').length;
   const activeAccountsCount = params.accounts.filter((a) => a.status !== 'DISCONNECTED').length;
 
   return {
@@ -94,8 +116,8 @@ export function computeSubscriptionUsage(params: {
     accountsUsed: activeAccountsCount,
     accountsLimit: params.plan?.maxFacebookAccounts ?? 0,
     groupsUsed: params.groups.length,
-    groupsLimit: params.plan?.maxGroups ?? 0,
-    scheduledTodayUsed,
-    scheduledTodayLimit: params.plan?.maxScheduledTasksPerDay ?? 0,
+    groupsLimit: params.plan?.maxSavedGroups ?? 0,
+    scheduledTasksUsed,
+    scheduledTasksLimit: params.plan?.maxScheduledTasks ?? 0,
   };
 }

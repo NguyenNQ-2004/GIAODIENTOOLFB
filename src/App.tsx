@@ -9,6 +9,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ExtensionPopupPage } from './pages/ExtensionPopupPage';
 import { PostComposerPage } from './pages/PostComposerPage';
 import { PricingPage } from './pages/PricingPage';
+import { IS_DEV_OR_DEMO } from './config/demoConfig';
 import { AppProvider, useApp } from './state/AppContext';
 
 const AuthGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -65,10 +66,39 @@ const GuestOnly: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const AppRoutes: React.FC = () => {
-  const { currentUser, toasts, dismissToast } = useApp();
+  const {
+    currentUser,
+    toasts,
+    dismissToast,
+    schemaMigrationNotice,
+    dismissSchemaMigrationNotice,
+  } = useApp();
 
   return (
     <>
+      {schemaMigrationNotice && (
+        <div
+          role="status"
+          className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 text-xs text-amber-900 flex items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-2 max-w-[1440px] mx-auto w-full justify-between">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px] text-amber-600 shrink-0">
+                info
+              </span>
+              <span>{schemaMigrationNotice}</span>
+            </div>
+            <button
+              type="button"
+              onClick={dismissSchemaMigrationNotice}
+              className="px-2.5 py-1 rounded-md border border-amber-300 bg-white hover:bg-amber-100 text-[11px] font-semibold text-amber-900 shrink-0"
+            >
+              Đã hiểu
+            </button>
+          </div>
+        </div>
+      )}
+
       <Routes>
         {/* Root redirect */}
         <Route
@@ -146,9 +176,13 @@ const AppRoutes: React.FC = () => {
         <Route
           path="/extension-preview"
           element={
-            <AuthGuard>
-              <ExtensionPopupPage />
-            </AuthGuard>
+            IS_DEV_OR_DEMO ? (
+              <AuthGuard>
+                <ExtensionPopupPage />
+              </AuthGuard>
+            ) : (
+              <Navigate to="/post" replace />
+            )
           }
         />
 

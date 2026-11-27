@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { IS_DEMO_MODE } from '../config/demoConfig';
 import { useApp } from '../state/AppContext';
 
 interface ConnectAccountModalProps {
@@ -129,46 +130,64 @@ export const ConnectAccountModal: React.FC<ConnectAccountModalProps> = ({ open, 
           )}
 
           {tab === 'oauth' ? (
-            <form onSubmit={handleSubmitOAuthDemo} className="space-y-4">
-              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
-                <p className="font-bold">Chế độ DEMO / Chưa kết nối Meta OAuth thực tế</p>
-                <p className="leading-relaxed">
-                  Trong môi trường production, nút này sẽ chuyển hướng tới Meta OAuth chính thức để
-                  cấp quyền quản lý Fanpage. Hiện tại bạn có thể tạo một hồ sơ Meta OAuth mẫu để
-                  kiểm thử luồng đăng Fanpage.
-                </p>
-              </div>
+            IS_DEMO_MODE ? (
+              <form onSubmit={handleSubmitOAuthDemo} className="space-y-4">
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+                  <p className="font-bold">Chế độ DEMO / Chưa kết nối Meta OAuth thực tế</p>
+                  <p className="leading-relaxed">
+                    Trong môi trường production, nút này sẽ chuyển hướng tới Meta OAuth chính thức để
+                    cấp quyền quản lý Fanpage. Hiện tại bạn có thể tạo một hồ sơ Meta OAuth mẫu để
+                    kiểm thử luồng đăng Fanpage.
+                  </p>
+                </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Tên hiển thị hồ sơ mẫu <span className="text-rose-600">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  required
-                  placeholder="Ví dụ: Nguyễn Văn A — Marketing"
-                  className="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/25"
-                />
-              </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Tên hiển thị hồ sơ mẫu <span className="text-rose-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    required
+                    placeholder="Ví dụ: Nguyễn Văn A — Marketing"
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/25"
+                  />
+                </div>
 
-              <div className="flex items-center justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="h-9 px-4 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-semibold"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
-                >
-                  Tạo kết nối Meta OAuth (DEMO)
-                </button>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="h-9 px-4 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-semibold"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+                  >
+                    Tạo kết nối Meta OAuth (DEMO)
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 leading-relaxed">
+                  Chức năng kết nối Meta OAuth thật yêu cầu Backend API và cấu hình Meta App đang hoạt
+                  động. Vui lòng hoàn tất tích hợp <code className="font-mono">POST /api/facebook-accounts/oauth/start</code>.
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="h-9 px-4 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-semibold"
+                  >
+                    Đóng
+                  </button>
+                </div>
               </div>
-            </form>
+            )
           ) : (
             <form onSubmit={handleSubmitManual} className="space-y-4">
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700">

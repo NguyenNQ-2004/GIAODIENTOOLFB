@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { IS_DEMO_MODE, IS_DEV_OR_DEMO } from '../config/demoConfig';
 import { useApp } from '../state/AppContext';
 import { ChangePasswordModal } from './ChangePasswordModal';
 
@@ -60,7 +61,7 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
   };
 
   const initials = currentUser
-    ? currentUser.fullName
+    ? currentUser.displayName
         .split(' ')
         .filter(Boolean)
         .slice(-2)
@@ -84,9 +85,11 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
                   <span className="font-bold text-[15px] tracking-tight text-slate-900">
                     FB POST PRO
                   </span>
-                  <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wide">
-                    DEMO
-                  </span>
+                  {IS_DEMO_MODE && (
+                    <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wide">
+                      DEMO
+                    </span>
+                  )}
                 </div>
                 <p className="text-[11px] text-slate-500 hidden xl:block">
                   Quản lý nội dung &amp; lịch đăng
@@ -116,27 +119,29 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
 
           {/* Right controls */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <Link
-              to="/extension-preview"
-              title="Xem trước giao diện Popup Extension (chế độ dev/preview)"
-              className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-                location.pathname === '/extension-preview'
-                  ? 'bg-blue-50 border-blue-200 text-blue-700'
-                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  hasConnectedDevice ? 'bg-emerald-500' : 'bg-slate-400'
+            {IS_DEV_OR_DEMO && (
+              <Link
+                to="/extension-preview"
+                title="Xem trước giao diện Popup Extension (chế độ dev/preview)"
+                className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                  location.pathname === '/extension-preview'
+                    ? 'bg-blue-50 border-blue-200 text-blue-700'
+                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                 }`}
-              />
-              <span>
-                Extension: {hasConnectedDevice ? 'Đã kết nối' : 'Chưa kết nối'}
-              </span>
-              <span className="text-[10px] text-slate-400 border-l border-slate-200 pl-1.5">
-                Preview
-              </span>
-            </Link>
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    hasConnectedDevice ? 'bg-emerald-500' : 'bg-slate-400'
+                  }`}
+                />
+                <span>
+                  Extension: {hasConnectedDevice ? 'Đã kết nối' : 'Chưa kết nối'}
+                </span>
+                <span className="text-[10px] text-slate-400 border-l border-slate-200 pl-1.5">
+                  Preview
+                </span>
+              </Link>
+            )}
 
             {/* User Profile Dropdown */}
             {currentUser && (
@@ -153,7 +158,7 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
                   </div>
                   <div className="hidden sm:block text-left leading-tight max-w-[140px]">
                     <p className="text-xs font-semibold text-slate-900 truncate">
-                      {currentUser.fullName}
+                      {currentUser.displayName}
                     </p>
                     <p className="text-[11px] text-slate-500 truncate">
                       {usageSummary.isActive && currentPlan
@@ -173,7 +178,7 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
                   >
                     <div className="px-4 py-2.5 border-b border-slate-100">
                       <p className="text-xs font-bold text-slate-900 truncate">
-                        {currentUser.fullName}
+                        {currentUser.displayName}
                       </p>
                       <p className="text-[11px] text-slate-500 truncate">{currentUser.email}</p>
                       <div className="mt-2 flex items-center gap-1.5">
@@ -210,32 +215,36 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
                         Đổi mật khẩu
                       </button>
 
-                      <Link
-                        to="/extension-preview"
-                        role="menuitem"
-                        onClick={() => setUserMenuOpen(false)}
-                        className="w-full px-4 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2.5"
-                      >
-                        <span className="material-symbols-outlined text-[17px] text-slate-400">
-                          extension
-                        </span>
-                        Xem trước Extension Popup
-                      </Link>
+                      {IS_DEV_OR_DEMO && (
+                        <Link
+                          to="/extension-preview"
+                          role="menuitem"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="w-full px-4 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2.5"
+                        >
+                          <span className="material-symbols-outlined text-[17px] text-slate-400">
+                            extension
+                          </span>
+                          Xem trước Extension Popup
+                        </Link>
+                      )}
 
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setUserMenuOpen(false);
-                          resetDemoData();
-                        }}
-                        className="w-full px-4 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2.5"
-                      >
-                        <span className="material-symbols-outlined text-[17px] text-slate-400">
-                          restart_alt
-                        </span>
-                        Đặt lại dữ liệu DEMO
-                      </button>
+                      {IS_DEMO_MODE && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            resetDemoData();
+                          }}
+                          className="w-full px-4 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2.5"
+                        >
+                          <span className="material-symbols-outlined text-[17px] text-slate-400">
+                            restart_alt
+                          </span>
+                          Đặt lại dữ liệu DEMO
+                        </button>
+                      )}
                     </div>
 
                     <div className="pt-1 border-t border-slate-100">
@@ -287,19 +296,21 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
                 <span>{item.label}</span>
               </NavLink>
             ))}
-            <NavLink
-              to="/extension-preview"
-              className={({ isActive }) =>
-                `px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${
-                  isActive
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`
-              }
-            >
-              <span className="material-symbols-outlined text-[18px]">extension</span>
-              <span>Extension Popup Preview</span>
-            </NavLink>
+            {IS_DEV_OR_DEMO && (
+              <NavLink
+                to="/extension-preview"
+                className={({ isActive }) =>
+                  `px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${
+                    isActive
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`
+                }
+              >
+                <span className="material-symbols-outlined text-[18px]">extension</span>
+                <span>Extension Popup Preview</span>
+              </NavLink>
+            )}
           </div>
         )}
       </header>

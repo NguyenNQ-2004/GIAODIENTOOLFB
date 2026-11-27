@@ -1,4 +1,5 @@
 import type {
+  ExtensionDevice,
   PublishingTask,
   PublishingTaskItem,
   TaskItemStatus,
@@ -9,6 +10,7 @@ import type {
   TaskProgress,
   TaskStatusMeta,
 } from '../types/viewModels';
+import { computeDeviceConnectionStatus } from './formatters';
 
 export const TASK_STATUS_META: Record<TaskStatus, TaskStatusMeta> = {
   SCHEDULED: {
@@ -185,22 +187,15 @@ export function deriveTaskStatus(
   const p = getTaskProgress(items);
   const hasActiveWork = p.pending > 0 || p.processing > 0 || p.waitingConfirmation > 0;
 
-  // When cancelled explicitly and no active work remains
   if (control.isCancelled && !hasActiveWork) {
     if (p.needsReview > 0) return 'NEEDS_REVIEW';
-    if (p.completed === 0 && p.failed === 0 && p.cancelled === p.total) {
-      return 'CANCELLED';
-    }
-    // Preserve terminal history while flagging cancellation if all remaining were cancelled
     return 'CANCELLED';
   }
 
-  // When paused and there is still unfinished work
   if (control.isPaused && hasActiveWork) {
     return 'PAUSED';
   }
 
-  // Active execution states
   if (p.processing > 0) {
     return 'RUNNING';
   }
@@ -214,7 +209,7 @@ export function deriveTaskStatus(
     return p.completed > 0 || p.failed > 0 ? 'RUNNING' : 'QUEUED';
   }
 
-  // All items are in terminal states (SUCCESS, FAILED, NEEDS_REVIEW, CANCELLED)
+  // All items are terminal
   if (p.cancelled === p.total) {
     return 'CANCELLED';
   }
@@ -234,6 +229,23 @@ export function deriveTaskStatus(
     return 'FAILED';
   }
   return 'COMPLETED';
+}
+
+export function isTaskDue(task: PublishingTask, now: Date = new Date()): boolean {
+  if (!task.scheduledAt) return true;
+  const scheduledMs = new Date(task.scheduledAt).getTime();
+  if (Number.isNaN(scheduledMs)) return true;
+  return scheduledMs <= now.getTime();
+}
+
+export function isScheduledTaskOverdue(task: PublishingTask, now: Date = new Date()): boolean {
+  return task.status === 'SCHEDULED' && Boolean(task.scheduledAt) && isTaskDue(task, now);
+}
+
+export function canRescheduleTask(task: PublishingTask): boolean {
+  if (task.status !== 'SCHEDULED' && task.status !== 'PAUSED') return false;
+  if (!task.scheduledAt) return false;
+  return task.items.every((i) => i.status === 'PENDING');
 }
 
 export function canPauseTask(task: PublishingTask): boolean {
@@ -259,17 +271,12 @@ export function canCancelTask(task: PublishingTask): boolean {
   );
 }
 
-export function canRetryItem(item: PublishingTaskItem): boolean {
+export function canRetryItem(task: PublishingTask, item: PublishingTaskItem): boolean {
+  if (task.status === 'PAUSED' || task.status === 'CANCELLED' || task.status === 'SCHEDULED') {
+    return false;
+  }
+  // Strictly only FAILED items (never SUCCESS, NEEDS_REVIEW, CANCELLED, etc.)
   return item.status === 'FAILED';
-}
-
-export function canConfirmItem(item: PublishingTaskItem): boolean {
-  return (
-    item.status === 'WAITING_CONFIRMATION' ||
-    item.status === 'PENDING' ||
-    item.status === 'PROCESSING' ||
-    item.status === 'NEEDS_REVIEW'
-  );
 }
 
 export function isTerminalTaskStatus(status: TaskStatus): boolean {
@@ -280,6 +287,119 @@ export function isTerminalTaskStatus(status: TaskStatus): boolean {
     status === 'NEEDS_REVIEW' ||
     status === 'CANCELLED'
   );
+}
+
+export interface TransitionValidationResult {
+  allowed: boolean;
+  error?: string;
+}
+
+/**
+ * Strict service-level guard for USER confirmation of a task item.
+ * Enforces:
+ * - Only MANUAL_GROUP tasks may use USER confirmation (META_PAGE_API cannot use USER confirmation).
+ * - Task must not be SCHEDULED (future/not started), PAUSED, or CANCELLED.
+ * - Task scheduledAt must already be due.
+ * - Item cannot be SUCCESS or CANCELLED (immutable terminal outcomes).
+ */
+export function validateUserConfirmItem(
+  task: PublishingTask,
+  item: PublishingTaskItem | undefined,
+  now: Date = new Date()
+): TransitionValidationResult {
+  if (!item) {
+    return { allowed: false, error: 'Không tìm thấy mục đăng cần xác nhận.' };
+  }
+  if (task.executionMode === 'META_PAGE_API') {
+    return {
+      allowed: false,
+      error:
+        'Tác vụ Fanpage (META_PAGE_API) không được dùng xác nhận thủ công (USER) thay thế phản hồi Meta API.',
+    };
+  }
+  if (task.status === 'SCHEDULED') {
+    return {
+      allowed: false,
+      error: 'Không thể xác nhận mục thuộc tác vụ đang hẹn giờ chưa đến thời điểm thực hiện.',
+    };
+  }
+  if (!isTaskDue(task, now)) {
+    return {
+      allowed: false,
+      error: 'Tác vụ chưa đến thời điểm thực hiện theo lịch.',
+    };
+  }
+  if (task.status === 'PAUSED') {
+    return {
+      allowed: false,
+      error: 'Không thể xác nhận mục khi tác vụ đang tạm dừng (PAUSED).',
+    };
+  }
+  if (task.status === 'CANCELLED') {
+    return {
+      allowed: false,
+      error: 'Không thể xác nhận mục thuộc tác vụ đã hủy (CANCELLED).',
+    };
+  }
+  if (item.status === 'SUCCESS') {
+    return {
+      allowed: false,
+      error: 'Mục này đã ở trạng thái Thành công (SUCCESS) và không thể bị ghi đè.',
+    };
+  }
+  if (item.status === 'CANCELLED') {
+    return {
+      allowed: false,
+      error: 'Mục này đã bị hủy (CANCELLED) và không thể chuyển sang trạng thái khác.',
+    };
+  }
+  if (item.status === 'FAILED') {
+    return {
+      allowed: false,
+      error: 'Mục đang ở trạng thái Thất bại (FAILED). Vui lòng dùng thao tác Thử lại trước khi xác nhận lại.',
+    };
+  }
+  // Allowed source states for MANUAL_GROUP user confirmation: WAITING_CONFIRMATION, PROCESSING, PENDING (when due & active), NEEDS_REVIEW
+  return { allowed: true };
+}
+
+export function canConfirmItem(
+  task: PublishingTask,
+  item: PublishingTaskItem,
+  now: Date = new Date()
+): boolean {
+  return validateUserConfirmItem(task, item, now).allowed;
+}
+
+export function validateRetryItem(
+  task: PublishingTask,
+  item: PublishingTaskItem | undefined
+): TransitionValidationResult {
+  if (!item) {
+    return { allowed: false, error: 'Không tìm thấy mục cần thử lại.' };
+  }
+  if (task.status === 'PAUSED' || task.status === 'CANCELLED' || task.status === 'SCHEDULED') {
+    return {
+      allowed: false,
+      error: 'Không thể thử lại mục khi tác vụ đang tạm dừng, đã hủy hoặc chưa đến lịch.',
+    };
+  }
+  if (item.status === 'SUCCESS') {
+    return { allowed: false, error: 'Không thể thử lại mục đã Thành công (SUCCESS).' };
+  }
+  if (item.status === 'NEEDS_REVIEW') {
+    return {
+      allowed: false,
+      error: 'Mục đang ở trạng thái Cần kiểm tra (NEEDS_REVIEW) không được thử lại tự động để tránh đăng trùng.',
+    };
+  }
+  if (item.status !== 'FAILED') {
+    return {
+      allowed: false,
+      error: 'Chỉ có thể thử lại các mục đang ở trạng thái Thất bại (FAILED).',
+    };
+  }
+  return { allowed: true };
 }
 
 export function pauseTask(task: PublishingTask, timestampIso: string): PublishingTask {
@@ -295,7 +415,8 @@ export function pauseTask(task: PublishingTask, timestampIso: string): Publishin
 export function resumeTask(task: PublishingTask, timestampIso: string): PublishingTask {
   if (!canResumeTask(task)) return task;
   const isScheduledFuture =
-    Boolean(task.scheduledAt) && new Date(task.scheduledAt!).getTime() > new Date(timestampIso).getTime();
+    Boolean(task.scheduledAt) &&
+    new Date(task.scheduledAt!).getTime() > new Date(timestampIso).getTime();
   const nextStatus = deriveTaskStatus(task.items, {
     isPaused: false,
     isScheduledFuture,
@@ -329,7 +450,8 @@ export function cancelTask(task: PublishingTask, timestampIso: string): Publishi
         ...item,
         status: 'NEEDS_REVIEW',
         errorCode: 'CANCELLED_IN_FLIGHT',
-        errorMessage: 'Tác vụ bị hủy khi mục đang xử lý. Vui lòng kiểm tra trực tiếp trên Facebook.',
+        errorMessage:
+          'Tác vụ bị hủy khi mục đang xử lý. Vui lòng kiểm tra trực tiếp trên Facebook.',
         finishedAt: timestampIso,
         updatedAt: timestampIso,
       };
@@ -355,26 +477,36 @@ export interface ConfirmItemPayload {
   confirmationType?: 'USER' | 'API';
 }
 
-/**
- * Confirms a single item (never blindly marks the entire task COMPLETED unless all items are terminal).
- */
 export function confirmTaskItem(
   task: PublishingTask,
   payload: ConfirmItemPayload,
   timestampIso: string
 ): PublishingTask {
-  let matched = false;
+  const targetItem = task.items.find((i) => i.id === payload.itemId);
+  const effectiveType = payload.confirmationType ?? 'USER';
+
+  if (effectiveType === 'USER') {
+    const check = validateUserConfirmItem(task, targetItem, new Date(timestampIso));
+    if (!check.allowed) return task;
+  } else if (!targetItem || targetItem.status === 'SUCCESS' || targetItem.status === 'CANCELLED') {
+    return task;
+  }
+
   const nextItems: PublishingTaskItem[] = task.items.map((item) => {
     if (item.id !== payload.itemId) return item;
-    matched = true;
     return {
       ...item,
       status: payload.status,
-      confirmationType: payload.confirmationType ?? 'USER',
-      resultPostUrl: payload.status === 'SUCCESS' ? (payload.resultPostUrl?.trim() || null) : item.resultPostUrl,
+      confirmationType: effectiveType,
+      resultPostUrl:
+        payload.status === 'SUCCESS'
+          ? payload.resultPostUrl?.trim() || null
+          : item.resultPostUrl,
       errorCode:
         payload.status === 'FAILED'
-          ? 'USER_REPORTED_FAILURE'
+          ? effectiveType === 'USER'
+            ? 'USER_REPORTED_FAILURE'
+            : 'META_API_ERROR'
           : payload.status === 'NEEDS_REVIEW'
           ? 'MANUAL_REVIEW_REQUIRED'
           : null,
@@ -392,10 +524,9 @@ export function confirmTaskItem(
     };
   });
 
-  if (!matched) return task;
-
   const isScheduledFuture =
-    Boolean(task.scheduledAt) && new Date(task.scheduledAt!).getTime() > new Date(timestampIso).getTime();
+    Boolean(task.scheduledAt) &&
+    new Date(task.scheduledAt!).getTime() > new Date(timestampIso).getTime();
   const nextStatus = deriveTaskStatus(nextItems, {
     isPaused: task.status === 'PAUSED',
     isScheduledFuture,
@@ -411,22 +542,20 @@ export function confirmTaskItem(
   };
 }
 
-/**
- * Retries a single FAILED item, incrementing attemptCount and moving it back to WAITING_CONFIRMATION (MANUAL_GROUP)
- * or PENDING (META_PAGE_API).
- */
 export function retryTaskItem(
   task: PublishingTask,
   itemId: string,
   timestampIso: string
 ): PublishingTask {
-  let retried = false;
+  const targetItem = task.items.find((i) => i.id === itemId);
+  const check = validateRetryItem(task, targetItem);
+  if (!check.allowed) return task;
+
   const retryTargetStatus: TaskItemStatus =
     task.executionMode === 'MANUAL_GROUP' ? 'WAITING_CONFIRMATION' : 'PENDING';
 
   const nextItems: PublishingTaskItem[] = task.items.map((item) => {
-    if (item.id !== itemId || !canRetryItem(item)) return item;
-    retried = true;
+    if (item.id !== itemId) return item;
     return {
       ...item,
       status: retryTargetStatus,
@@ -439,8 +568,6 @@ export function retryTaskItem(
     };
   });
 
-  if (!retried) return task;
-
   const nextStatus = deriveTaskStatus(nextItems, { isPaused: false });
   return {
     ...task,
@@ -452,12 +579,15 @@ export function retryTaskItem(
 }
 
 export function retryAllFailedItems(task: PublishingTask, timestampIso: string): PublishingTask {
+  if (task.status === 'PAUSED' || task.status === 'CANCELLED' || task.status === 'SCHEDULED') {
+    return task;
+  }
   let retriedCount = 0;
   const retryTargetStatus: TaskItemStatus =
     task.executionMode === 'MANUAL_GROUP' ? 'WAITING_CONFIRMATION' : 'PENDING';
 
   const nextItems: PublishingTaskItem[] = task.items.map((item) => {
-    if (!canRetryItem(item)) return item;
+    if (!canRetryItem(task, item)) return item;
     retriedCount += 1;
     return {
       ...item,
@@ -481,4 +611,61 @@ export function retryAllFailedItems(task: PublishingTask, timestampIso: string):
     finishedAt: null,
     updatedAt: timestampIso,
   };
+}
+
+export interface EligibleExtensionSelection {
+  task: PublishingTask;
+  item: PublishingTaskItem;
+}
+
+/**
+ * Strict Extension Preview task & item eligibility filter.
+ * NEVER falls back to tasks[0] or items[0].
+ * Only returns MANUAL_GROUP tasks belonging to userId that are due, not PAUSED/CANCELLED/COMPLETED/FAILED,
+ * with an active item ready for user action, while subscription is active and at least one non-revoked device exists.
+ */
+export function getEligibleExtensionSelection(params: {
+  userId: string;
+  tasks: PublishingTask[];
+  devices: ExtensionDevice[];
+  isSubscriptionActive: boolean;
+  now?: Date;
+}): EligibleExtensionSelection | null {
+  const now = params.now ?? new Date();
+  if (!params.isSubscriptionActive) return null;
+
+  const hasNonRevokedDevice = params.devices.some(
+    (d) => d.userId === params.userId && computeDeviceConnectionStatus(d, now) !== 'REVOKED'
+  );
+  if (!hasNonRevokedDevice) return null;
+
+  const eligibleTasks = params.tasks.filter((t) => {
+    if (t.userId !== params.userId) return false;
+    if (t.executionMode !== 'MANUAL_GROUP') return false;
+    if (
+      t.status === 'SCHEDULED' ||
+      t.status === 'PAUSED' ||
+      t.status === 'CANCELLED' ||
+      t.status === 'COMPLETED' ||
+      t.status === 'FAILED'
+    ) {
+      return false;
+    }
+    if (!isTaskDue(t, now)) return false;
+    return true;
+  });
+
+  for (const task of eligibleTasks) {
+    const item = task.items.find(
+      (i) =>
+        i.status === 'WAITING_CONFIRMATION' ||
+        i.status === 'PROCESSING' ||
+        i.status === 'PENDING'
+    );
+    if (item && validateUserConfirmItem(task, item, now).allowed) {
+      return { task, item };
+    }
+  }
+
+  return null;
 }

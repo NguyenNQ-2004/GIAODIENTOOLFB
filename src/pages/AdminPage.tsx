@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
+import { IS_DEMO_MODE } from '../config/demoConfig';
 import { useApp } from '../state/AppContext';
 import type { PaymentOrder, Plan, UserRole } from '../types/domain';
 import { formatVietnamDate, formatVietnamDateTime } from '../utils/dateTime';
-import { formatVnd, isSubscriptionActive } from '../utils/formatters';
+import { classifyPaymentOrderIntent, formatVnd, isSubscriptionActive } from '../utils/formatters';
 
 type AdminTab = 'overview' | 'users' | 'plans' | 'payments';
 
@@ -31,18 +32,17 @@ export const AdminPage: React.FC = () => {
   const [editingPlanId, setEditingPlanId] = useState<string | undefined>(undefined);
   const [planCode, setPlanCode] = useState('');
   const [planName, setPlanName] = useState('');
-  const [planDesc, setPlanDesc] = useState('');
   const [priceMonthly, setPriceMonthly] = useState('299000');
   const [priceYearly, setPriceYearly] = useState('2990000');
   const [maxAccounts, setMaxAccounts] = useState('5');
-  const [maxGroups, setMaxGroups] = useState('100');
+  const [maxSavedGroups, setMaxSavedGroups] = useState('100');
   const [maxScheduled, setMaxScheduled] = useState('30');
-  const [featuresText, setFeaturesText] = useState('');
   const [planActive, setPlanActive] = useState(true);
 
   // Admin DEMO payment confirmation modal
   const [confirmingOrder, setConfirmingOrder] = useState<PaymentOrder | null>(null);
   const [providerRef, setProviderRef] = useState('');
+  const [acknowledgePlanChange, setAcknowledgePlanChange] = useState(false);
 
   const planMap = useMemo(() => new Map(plans.map((p) => [p.id, p])), [plans]);
   const userMap = useMemo(() => new Map(allUsers.map((u) => [u.id, u])), [allUsers]);
@@ -67,7 +67,7 @@ export const AdminPage: React.FC = () => {
     return allUsers.filter((u) => {
       if (!q) return true;
       return (
-        u.fullName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+        u.displayName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
       );
     });
   }, [allUsers, userSearch]);
@@ -78,17 +78,26 @@ export const AdminPage: React.FC = () => {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [allOrders, orderStatusFilter]);
 
+  const confirmingOrderContext = useMemo(() => {
+    if (!confirmingOrder) return null;
+    const buyerSubs = allSubscriptions
+      .filter((s) => s.userId === confirmingOrder.userId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const activeBuyerSub = buyerSubs.find((s) => isSubscriptionActive(s)) ?? buyerSubs[0] ?? null;
+    const intent = classifyPaymentOrderIntent(activeBuyerSub, confirmingOrder.planId);
+    const isExpired = new Date(confirmingOrder.expiresAt).getTime() <= Date.now();
+    return { activeBuyerSub, intent, isExpired };
+  }, [confirmingOrder, allSubscriptions]);
+
   const openCreatePlan = () => {
     setEditingPlanId(undefined);
     setPlanCode('');
     setPlanName('');
-    setPlanDesc('');
     setPriceMonthly('299000');
     setPriceYearly('2990000');
     setMaxAccounts('5');
-    setMaxGroups('100');
+    setMaxSavedGroups('100');
     setMaxScheduled('30');
-    setFeaturesText('');
     setPlanActive(true);
     setPlanModalOpen(true);
   };
@@ -97,13 +106,11 @@ export const AdminPage: React.FC = () => {
     setEditingPlanId(plan.id);
     setPlanCode(plan.code);
     setPlanName(plan.name);
-    setPlanDesc(plan.description);
-    setPriceMonthly(String(plan.priceMonthlyVnd));
-    setPriceYearly(String(plan.priceYearlyVnd));
+    setPriceMonthly(String(plan.monthlyPriceVnd));
+    setPriceYearly(String(plan.yearlyPriceVnd));
     setMaxAccounts(String(plan.maxFacebookAccounts));
-    setMaxGroups(String(plan.maxGroups));
-    setMaxScheduled(String(plan.maxScheduledTasksPerDay));
-    setFeaturesText(plan.features.join('\n'));
+    setMaxSavedGroups(String(plan.maxSavedGroups));
+    setMaxScheduled(String(plan.maxScheduledTasks));
     setPlanActive(plan.isActive);
     setPlanModalOpen(true);
   };
@@ -114,16 +121,11 @@ export const AdminPage: React.FC = () => {
       id: editingPlanId,
       code: planCode,
       name: planName,
-      description: planDesc,
-      priceMonthlyVnd: Number(priceMonthly) || 0,
-      priceYearlyVnd: Number(priceYearly) || 0,
+      monthlyPriceVnd: Number(priceMonthly) || 0,
+      yearlyPriceVnd: Number(priceYearly) || 0,
       maxFacebookAccounts: Number(maxAccounts) || 1,
-      maxGroups: Number(maxGroups) || 1,
-      maxScheduledTasksPerDay: Number(maxScheduled) || 1,
-      features: featuresText
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean),
+      maxSavedGroups: Number(maxSavedGroups) || 1,
+      maxScheduledTasks: Number(maxScheduled) || 1,
       isActive: planActive,
     });
     if (!res.ok) {
@@ -144,6 +146,7 @@ export const AdminPage: React.FC = () => {
     const res = adminConfirmPaymentDemo({
       orderId: confirmingOrder.id,
       providerReference: providerRef.trim() || undefined,
+      acknowledgeUnapprovedPlanChangePolicy: acknowledgePlanChange,
     });
     if (!res.ok) {
       addToast('error', 'Không thể xác nhận thanh toán', res.error);
@@ -152,10 +155,11 @@ export const AdminPage: React.FC = () => {
     addToast(
       'success',
       'Đã xác nhận đơn thanh toán (DEMO)',
-      `Đơn ${confirmingOrder.orderCode} đã chuyển PAID và kích hoạt gói cho người dùng.`
+      `Đơn ${confirmingOrder.orderCode} đã chuyển PAID và cập nhật gói dịch vụ cho người dùng.`
     );
     setConfirmingOrder(null);
     setProviderRef('');
+    setAcknowledgePlanChange(false);
   };
 
   return (
@@ -281,13 +285,13 @@ export const AdminPage: React.FC = () => {
                     <tr key={u.id} className="hover:bg-slate-50/70">
                       <td className="px-4 py-3">
                         <p className="font-bold text-slate-900">
-                          {u.fullName} {isSelf && <span className="text-blue-600">(Bạn)</span>}
+                          {u.displayName} {isSelf && <span className="text-blue-600">(Bạn)</span>}
                         </p>
                         <p className="text-[11px] text-slate-500">{u.email}</p>
                       </td>
                       <td className="px-4 py-3">
                         <select
-                          aria-label={`Vai trò của ${u.fullName}`}
+                          aria-label={`Vai trò của ${u.displayName}`}
                           value={u.role}
                           disabled={isSelf}
                           onChange={(e) => {
@@ -298,7 +302,7 @@ export const AdminPage: React.FC = () => {
                             if (!res.ok) {
                               addToast('error', 'Không thể đổi vai trò', res.error);
                             } else {
-                              addToast('success', 'Đã cập nhật vai trò', `${u.fullName} → ${e.target.value}`);
+                              addToast('success', 'Đã cập nhật vai trò', `${u.displayName} → ${e.target.value}`);
                             }
                           }}
                           className="h-8 px-2 rounded border border-slate-200 bg-white text-xs font-semibold disabled:opacity-50"
@@ -331,7 +335,7 @@ export const AdminPage: React.FC = () => {
                               {plan.code} · {subActive ? 'ACTIVE' : sub.status}
                             </span>
                             <p className="text-[10px] text-slate-500 mt-0.5">
-                              Hết hạn: {formatVietnamDate(sub.endsAt)}
+                              Hết hạn: {formatVietnamDate(sub.expiresAt)}
                             </p>
                           </div>
                         ) : (
@@ -428,14 +432,14 @@ export const AdminPage: React.FC = () => {
 
                 <div className="text-xs text-slate-700 space-y-1">
                   <p>
-                    Giá tháng: <strong>{formatVnd(plan.priceMonthlyVnd)}</strong>
+                    Giá tháng: <strong>{formatVnd(plan.monthlyPriceVnd)}</strong>
                   </p>
                   <p>
-                    Giá năm: <strong>{formatVnd(plan.priceYearlyVnd)}</strong>
+                    Giá năm: <strong>{formatVnd(plan.yearlyPriceVnd)}</strong>
                   </p>
                   <p>
-                    Hạn mức: {plan.maxFacebookAccounts} hồ sơ · {plan.maxGroups} nhóm ·{' '}
-                    {plan.maxScheduledTasksPerDay} tác vụ/ngày
+                    Hạn mức: {plan.maxFacebookAccounts} hồ sơ · {plan.maxSavedGroups} nhóm ·{' '}
+                    {plan.maxScheduledTasks} lịch chờ (SCHEDULED)
                   </p>
                 </div>
               </div>
@@ -491,7 +495,7 @@ export const AdminPage: React.FC = () => {
                         {ord.orderCode}
                       </td>
                       <td className="px-4 py-3">
-                        <p className="font-semibold text-slate-900">{buyer?.fullName ?? ord.userId}</p>
+                        <p className="font-semibold text-slate-900">{buyer?.displayName ?? ord.userId}</p>
                         <p className="text-[11px] text-slate-500">{buyer?.email}</p>
                       </td>
                       <td className="px-4 py-3 text-slate-700">
@@ -517,12 +521,13 @@ export const AdminPage: React.FC = () => {
                         {formatVietnamDateTime(ord.createdAt)}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {ord.status === 'PENDING' ? (
+                        {ord.status === 'PENDING' && IS_DEMO_MODE ? (
                           <button
                             type="button"
                             onClick={() => {
                               setConfirmingOrder(ord);
                               setProviderRef('');
+                              setAcknowledgePlanChange(false);
                             }}
                             className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
                           >
@@ -592,15 +597,6 @@ export const AdminPage: React.FC = () => {
                   />
                 </div>
               </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Mô tả</label>
-                <input
-                  type="text"
-                  value={planDesc}
-                  onChange={(e) => setPlanDesc(e.target.value)}
-                  className="w-full h-9 px-3 rounded-lg border border-slate-200"
-                />
-              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Giá tháng (VND)</label>
@@ -638,18 +634,18 @@ export const AdminPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Max Nhóm</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Max Nhóm lưu</label>
                   <input
                     type="number"
                     min={1}
                     required
-                    value={maxGroups}
-                    onChange={(e) => setMaxGroups(e.target.value)}
+                    value={maxSavedGroups}
+                    onChange={(e) => setMaxSavedGroups(e.target.value)}
                     className="w-full h-9 px-3 rounded-lg border border-slate-200"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Max Tác vụ/ngày</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Max Lịch chờ</label>
                   <input
                     type="number"
                     min={1}
@@ -659,17 +655,6 @@ export const AdminPage: React.FC = () => {
                     className="w-full h-9 px-3 rounded-lg border border-slate-200"
                   />
                 </div>
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Danh sách tính năng (mỗi dòng 1 mục)
-                </label>
-                <textarea
-                  rows={3}
-                  value={featuresText}
-                  onChange={(e) => setFeaturesText(e.target.value)}
-                  className="w-full p-2.5 rounded-lg border border-slate-200"
-                />
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -701,7 +686,7 @@ export const AdminPage: React.FC = () => {
       )}
 
       {/* Admin DEMO Payment Confirmation Modal */}
-      {confirmingOrder && (
+      {confirmingOrder && confirmingOrderContext && (
         <div
           className="fixed inset-0 z-[85] flex items-center justify-center bg-slate-900/45 p-4"
           role="dialog"
@@ -718,11 +703,69 @@ export const AdminPage: React.FC = () => {
               </h3>
             </div>
             <form onSubmit={handleConfirmOrderDemo} className="p-5 space-y-4 text-xs">
-              <p className="text-slate-600 leading-relaxed">
-                Xác nhận đơn <strong>{confirmingOrder.orderCode}</strong> với số tiền{' '}
-                <strong>{formatVnd(confirmingOrder.amountVnd)}</strong> sẽ chuyển đơn sang{' '}
-                <strong>PAID</strong> và kích hoạt gói dịch vụ cho khách hàng.
-              </p>
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Loại giao dịch</span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      confirmingOrderContext.intent === 'RENEWAL'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : confirmingOrderContext.intent === 'CHANGE_PLAN'
+                        ? 'bg-amber-50 text-amber-800'
+                        : 'bg-blue-50 text-blue-700'
+                    }`}
+                  >
+                    {confirmingOrderContext.intent === 'RENEWAL'
+                      ? 'Gia hạn (RENEWAL)'
+                      : confirmingOrderContext.intent === 'CHANGE_PLAN'
+                      ? 'Đổi gói giữa kỳ (CHANGE_PLAN)'
+                      : 'Mua mới (PURCHASE)'}
+                  </span>
+                </div>
+                <p className="text-slate-600 leading-relaxed">
+                  Xác nhận đơn <strong>{confirmingOrder.orderCode}</strong> ({formatVnd(confirmingOrder.amountVnd)}).
+                  {confirmingOrderContext.intent === 'RENEWAL' && confirmingOrderContext.activeBuyerSub && (
+                    <>
+                      {' '}
+                      Thời hạn mới sẽ cộng dồn từ ngày hết hạn hiện tại (
+                      <strong>{formatVietnamDate(confirmingOrderContext.activeBuyerSub.expiresAt)}</strong>),
+                      không làm mất thời gian còn lại.
+                    </>
+                  )}
+                </p>
+              </div>
+
+              {confirmingOrderContext.isExpired && (
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800">
+                  Đơn hàng này đã quá hạn ({formatVietnamDateTime(confirmingOrder.expiresAt)}). Hệ thống
+                  sẽ từ chối xác nhận và chuyển đơn sang trạng thái EXPIRED.
+                </div>
+              )}
+
+              {confirmingOrderContext.intent === 'CHANGE_PLAN' && !confirmingOrderContext.isExpired && (
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 space-y-2">
+                  <p className="font-semibold">
+                    Chính sách đổi gói giữa kỳ chưa được chủ sản phẩm phê duyệt
+                  </p>
+                  <p className="leading-relaxed">
+                    Khách hàng đang có gói còn hiệu lực khác với gói của đơn này. Quy tắc hoàn trừ
+                    hoặc cộng dồn thời gian còn lại cần được chốt trong Backend thật (xem{' '}
+                    <code className="font-mono">docs/OPEN_QUESTIONS.md</code>).
+                  </p>
+                  <label className="flex items-start gap-2 cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={acknowledgePlanChange}
+                      onChange={(e) => setAcknowledgePlanChange(e.target.checked)}
+                      className="mt-0.5 rounded border-amber-400 text-amber-700"
+                    />
+                    <span className="font-semibold">
+                      Tôi hiểu đây là xác nhận mô phỏng DEMO cho đơn đổi gói giữa kỳ
+                    </span>
+                  </label>
+                </div>
+              )}
+
               <div>
                 <label className="block font-semibold text-slate-700 mb-1.5">
                   Mã tham chiếu giao dịch (tùy chọn)

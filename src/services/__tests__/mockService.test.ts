@@ -36,7 +36,7 @@ describe('MockAppService business flow integrity', () => {
     assert.equal(usage.isActive, false);
     assert.equal(usage.accountsUsed, 0);
     assert.equal(usage.groupsUsed, 0);
-    assert.equal(usage.scheduledTodayUsed, 0);
+    assert.equal(usage.scheduledTasksUsed, 0);
 
     const taskRes = service.createTask(userId, {
       facebookAccountId: null,

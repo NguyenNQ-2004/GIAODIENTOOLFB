@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { IS_DEMO_MODE } from '../config/demoConfig';
 import { useApp } from '../state/AppContext';
 import type { BillingPeriod, PaymentOrder, PaymentOrderStatus } from '../types/domain';
 import { computeCountdown, formatVietnamDate, formatVietnamDateTime } from '../utils/dateTime';
-import { formatVnd } from '../utils/formatters';
+import { classifyPaymentOrderIntent, formatVnd } from '../utils/formatters';
 
 const ORDER_STATUS_META: Record<PaymentOrderStatus, { label: string; badgeClass: string }> = {
   PENDING: { label: 'Chờ thanh toán', badgeClass: 'bg-amber-50 text-amber-800 border-amber-200' },
@@ -154,7 +155,7 @@ export const PricingPage: React.FC = () => {
             {usageSummary.subscription && (
               <p className="text-xs text-slate-500 mt-1">
                 Hiệu lực: {formatVietnamDate(usageSummary.subscription.startsAt)} —{' '}
-                {formatVietnamDate(usageSummary.subscription.endsAt)} (
+                {formatVietnamDate(usageSummary.subscription.expiresAt)} (
                 {usageSummary.subscription.billingPeriod === 'YEARLY' ? 'Theo năm' : 'Theo tháng'})
               </p>
             )}
@@ -174,9 +175,9 @@ export const PricingPage: React.FC = () => {
               limit: usageSummary.groupsLimit,
             },
             {
-              label: 'Tác vụ đã tạo hôm nay',
-              used: usageSummary.scheduledTodayUsed,
-              limit: usageSummary.scheduledTodayLimit,
+              label: 'Tác vụ đang chờ lịch (SCHEDULED)',
+              used: usageSummary.scheduledTasksUsed,
+              limit: usageSummary.scheduledTasksLimit,
             },
           ].map((metric) => (
             <div key={metric.label} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
@@ -201,8 +202,16 @@ export const PricingPage: React.FC = () => {
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {activePlans.map((plan) => {
           const price =
-            billingPeriod === 'YEARLY' ? plan.priceYearlyVnd : plan.priceMonthlyVnd;
+            billingPeriod === 'YEARLY' ? plan.yearlyPriceVnd : plan.monthlyPriceVnd;
           const isCurrent = usageSummary.isActive && usageSummary.plan?.id === plan.id;
+          const orderIntent = classifyPaymentOrderIntent(usageSummary.subscription, plan.id);
+          const ctaLabel =
+            orderIntent === 'RENEWAL'
+              ? 'Gia hạn gói này'
+              : orderIntent === 'CHANGE_PLAN'
+              ? 'Đổi sang gói này'
+              : 'Đăng ký gói này';
+
           return (
             <div
               key={plan.id}
@@ -217,7 +226,11 @@ export const PricingPage: React.FC = () => {
                     {plan.code}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 leading-relaxed">{plan.description}</p>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Phù hợp với nhu cầu quản lý tối đa {plan.maxFacebookAccounts} hồ sơ Facebook,{' '}
+                  {plan.maxSavedGroups} nhóm đã lưu và {plan.maxScheduledTasks} tác vụ chờ lịch cùng
+                  lúc.
+                </p>
                 <div className="pt-1">
                   <span className="text-2xl font-bold text-slate-900 tabular-nums">
                     {formatVnd(price)}
@@ -238,36 +251,52 @@ export const PricingPage: React.FC = () => {
                     <span className="material-symbols-outlined text-[16px] text-emerald-600">
                       check_circle
                     </span>
-                    Lưu trữ tối đa <strong>{plan.maxGroups}</strong> nhóm Facebook
+                    Lưu trữ tối đa <strong>{plan.maxSavedGroups}</strong> nhóm Facebook
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-[16px] text-emerald-600">
                       check_circle
                     </span>
-                    Tối đa <strong>{plan.maxScheduledTasksPerDay}</strong> tác vụ/ngày
+                    Tối đa <strong>{plan.maxScheduledTasks}</strong> tác vụ đang chờ lịch (SCHEDULED)
                   </li>
-                  {plan.features.map((feat) => (
-                    <li key={feat} className="flex items-start gap-2">
-                      <span className="material-symbols-outlined text-[16px] text-blue-600 mt-0.5 shrink-0">
-                        done
-                      </span>
-                      <span>{feat}</span>
-                    </li>
-                  ))}
+                  <li className="flex items-start gap-2 text-slate-600">
+                    <span className="material-symbols-outlined text-[16px] text-blue-600 mt-0.5 shrink-0">
+                      done
+                    </span>
+                    <span>Đăng nhóm hỗ trợ Extension &amp; đăng Fanpage qua Meta API</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-slate-600">
+                    <span className="material-symbols-outlined text-[16px] text-blue-600 mt-0.5 shrink-0">
+                      done
+                    </span>
+                    <span>Quản lý bộ sưu tập nhóm, soạn đa bài đăng &amp; lịch đăng GMT+7</span>
+                  </li>
                 </ul>
               </div>
 
-              <button
-                type="button"
-                onClick={() => handleCreateOrder(plan.id)}
-                className={`w-full h-10 rounded-lg text-xs font-semibold transition-colors ${
-                  isCurrent
-                    ? 'border border-blue-600 text-blue-700 bg-blue-50 hover:bg-blue-100'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                }`}
-              >
-                {isCurrent ? 'Gia hạn gói này' : 'Tạo đơn nâng cấp'}
-              </button>
+              <div className="space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleCreateOrder(plan.id)}
+                  className={`w-full h-10 rounded-lg text-xs font-semibold transition-colors ${
+                    isCurrent
+                      ? 'border border-blue-600 text-blue-700 bg-blue-50 hover:bg-blue-100'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                >
+                  {ctaLabel}
+                </button>
+                {orderIntent === 'RENEWAL' && (
+                  <p className="text-[11px] text-slate-500 text-center">
+                    Gia hạn giữ nguyên thời gian còn lại của gói hiện tại.
+                  </p>
+                )}
+                {orderIntent === 'CHANGE_PLAN' && (
+                  <p className="text-[11px] text-amber-700 text-center">
+                    Đổi gói giữa kỳ cần đối soát theo chính sách chủ sản phẩm.
+                  </p>
+                )}
+              </div>
             </div>
           );
         })}
@@ -279,9 +308,11 @@ export const PricingPage: React.FC = () => {
         <section className="xl:col-span-5 bg-white rounded-xl border border-slate-200 p-5 space-y-4">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-bold text-slate-900">Chi tiết đơn thanh toán</h2>
-            <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
-              DEMO — Chưa kết nối VietQR thật
-            </span>
+            {IS_DEMO_MODE && (
+              <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
+                DEMO — Chưa kết nối VietQR thật
+              </span>
+            )}
           </div>
 
           {!activeOrder ? (
@@ -447,8 +478,12 @@ export const PricingPage: React.FC = () => {
         onCancel={() => setCancelTargetOrder(null)}
         onConfirm={() => {
           if (cancelTargetOrder) {
-            cancelPaymentOrder(cancelTargetOrder.id);
-            addToast('info', 'Đã hủy đơn hàng', cancelTargetOrder.orderCode);
+            const res = cancelPaymentOrder(cancelTargetOrder.id);
+            if (!res.ok) {
+              addToast('error', 'Không thể hủy đơn hàng', res.error);
+            } else {
+              addToast('info', 'Đã hủy đơn hàng', cancelTargetOrder.orderCode);
+            }
           }
           setCancelTargetOrder(null);
         }}

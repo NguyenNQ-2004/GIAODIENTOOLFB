@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { IS_DEMO_MODE } from '../config/demoConfig';
 import { DEMO_ACCOUNTS } from '../data/mockData';
 import { useApp } from '../state/AppContext';
 
@@ -15,7 +16,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
   const [searchParams] = useSearchParams();
 
   // Always empty defaults — NEVER prefill passwords
-  const [fullName, setFullName] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -33,11 +34,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
       setError(res.error ?? 'Đăng nhập thất bại.');
       return;
     }
-    addToast('success', 'Đăng nhập thành công (DEMO)', `Xin chào ${res.data.fullName}.`);
-    navigate('/post', { replace: true });
+    addToast('success', 'Đăng nhập thành công (DEMO)', `Xin chào ${res.data.displayName}.`);
+    navigate(res.data.role === 'ADMIN' ? '/admin' : '/post', { replace: true });
   };
 
   const handleQuickDemoLogin = (userId: string) => {
+    if (!IS_DEMO_MODE) return;
     setError(null);
     const res = loginAsDemoUser(userId);
     if (!res.ok || !res.data) {
@@ -47,7 +49,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     addToast(
       'success',
       'Đã vào phiên DEMO',
-      `Đang sử dụng tài khoản ${res.data.fullName} (${res.data.role}).`
+      `Đang sử dụng tài khoản ${res.data.displayName} (${res.data.role}).`
     );
     navigate(res.data.role === 'ADMIN' ? '/admin' : '/post', { replace: true });
   };
@@ -59,7 +61,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
       setError('Mật khẩu xác nhận không khớp.');
       return;
     }
-    const res = register({ fullName, email, password });
+    const res = register({ displayName, email, password });
     if (!res.ok || !res.data) {
       setError(res.error ?? 'Đăng ký thất bại.');
       return;
@@ -166,7 +168,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
 
         <div className="relative z-10 mt-10 pt-5 border-t border-white/10 text-[11px] text-slate-400">
           Môi trường DEMO cục bộ: Dữ liệu phiên và xác thực được mô phỏng trên trình duyệt, chưa kết
-          nối máy chủ backend thực tế.
+          nối máy chủ backend thực tế. Không nhập mật khẩu hoặc thông tin đăng nhập Meta/Facebook thật tại đây.
         </div>
       </div>
 
@@ -287,13 +289,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
               <form onSubmit={handleRegister} className="space-y-4">
                 <div>
                   <label htmlFor="reg-name" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Họ và tên
+                    Tên hiển thị
                   </label>
                   <input
                     id="reg-name"
                     type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
                     required
                     placeholder="Nguyễn Văn A"
                     className="w-full h-10 px-3.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500"
@@ -474,14 +476,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
             )}
           </div>
 
-          {/* Explicit DEMO Quick Login Card */}
-          {mode === 'login' && (
+          {/* Explicit DEMO Quick Login Card (strictly gated by IS_DEMO_MODE) */}
+          {mode === 'login' && IS_DEMO_MODE && (
             <div className="mt-4 bg-white rounded-2xl border border-slate-200 p-5">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-bold text-slate-800 uppercase tracking-wide">
                   Đăng nhập nhanh (DEMO)
                 </p>
-                <span className="text-[11px] text-slate-500">Không cần nhập mật khẩu</span>
+                <span className="text-[11px] text-slate-500">Chỉ dùng cho môi trường thử nghiệm</span>
               </div>
               <div className="space-y-2">
                 {DEMO_ACCOUNTS.map((acc) => (
@@ -513,7 +515,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
                 ))}
               </div>
               <p className="mt-3 text-[11px] text-slate-500 leading-relaxed">
-                Hoặc đăng nhập bằng form phía trên với mật khẩu mẫu:{' '}
+                Lưu ý bảo mật DEMO: Không sử dụng mật khẩu thật. Mật khẩu mẫu:{' '}
                 <code className="px-1 py-0.5 rounded bg-slate-100 text-slate-700">Demo@1234</code>{' '}
                 (Khách hàng) hoặc{' '}
                 <code className="px-1 py-0.5 rounded bg-slate-100 text-slate-700">Admin@1234</code>{' '}

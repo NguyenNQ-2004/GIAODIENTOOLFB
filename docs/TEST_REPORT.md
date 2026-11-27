@@ -1,25 +1,35 @@
-# Frontend Audit & Verification Test Report
+# Frontend Acceptance Test Report — V3 Final
 
-## 1. Automated Unit & Service Tests (`node:test`)
-Command: `npx --yes tsx --test src/utils/__tests__/taskStatus.test.ts src/utils/__tests__/validationAndCsv.test.ts src/services/__tests__/mockService.test.ts`
+## 1. Build & TypeScript Verification
+- `npm run lint` (`tsc --noEmit`): **PASS** (0 errors)
+- `npm run build` (`vite build`): **PASS** (clean production bundle)
+- Legacy field audit (`grep` across `src/` for `fullName`, `endsAt`, `priceMonthlyVnd`, `priceYearlyVnd`, `maxGroups`, `maxScheduledTasksPerDay`, `scheduledTodayUsed`, `scheduledTodayLimit`): **0 matches**
 
-- **Result**: **18 / 18 passed, 0 failed** across 5 test suites.
-- Coverage:
-  - `taskStatus.test.ts` (5 tests): All 10 canonical `TaskStatus` derivations, Pause -> `PAUSED` & Resume, Per-Item Confirmation without blindly marking task complete, Cancel (`PROCESSING -> NEEDS_REVIEW`, preserving `SUCCESS`/`FAILED`), Retry eligibility (`FAILED` only + `attemptCount` increment).
-  - `validationAndCsv.test.ts` (7 tests): Image-only / link-only / text-only draft validation, invalid URL rejection, Facebook group URL normalization & numeric UID extraction (never fabricating UID), RFC-4180 CSV classification (`VALID` / `DUPLICATE` / `ERROR`), CSV formula-injection neutralization (`=`, `+`, `-`, `@` prefixed with `'`), GMT+7 -> ISO UTC conversion, future schedule validation, live countdown from `expiresAt`, dynamic calendar month grid, device `REVOKED` / `CONNECTED` / `OFFLINE` derivation.
-  - `mockService.test.ts` (6 tests): User isolation on logout & login switch (TEST-30), expired subscription blocking task creation & exact `0` usage, `idempotencyKey` deduplication & Fanpage `canPublish = false` blocking, many-to-many Group Collections & non-destructive collection deletion, customer `checkOrderStatus` never auto-marking `PAID` vs Admin DEMO payment confirmation activating subscription, Admin self-lock prevention, truthful `refreshAccountStatus`, non-destructive `disconnectAccount`, and revoked device reconnect block.
+## 2. Automated Unit & Regression Tests (`npm run test` — `tsx --test`)
+**Result: 29 / 29 tests PASSED across 6 test suites (0 failures, 0 skipped).**
 
-## 2. TypeScript Check & Production Build
-- `npm run lint` (`tsc --noEmit`): **PASS (0 errors)**
-- `npm run build` (`vite build`): **PASS**
+| Suite | File | Tests | Covered Scope |
+|---|---|---|---|
+| V3 Acceptance Regression (`TEST-31`..`TEST-50`) | `src/services/__tests__/acceptanceV3.test.ts` | 11 | Reactive structural-sharing snapshots (`TEST-31..33`), exact per-draft destination pairs (`TEST-34..35`), official `maxScheduledTasks` concurrent `SCHEDULED` quota & overdue expiry (`TEST-36..37b`), payment renewal preservation / expired / double-confirm / `CHANGE_PLAN` policy guard (`TEST-38..40`), strict task state machine transitions (`TEST-41..44`), persistent `DemoMediaStorage` + `isMediaReferenced` snapshot retention (`TEST-45..47`), strict Extension eligible selection with zero fallback (`TEST-48`), Admin plan price live sync & canonical schema (`TEST-49`), localStorage schema v3 migration & notice (`TEST-50`) |
+| Service Business Integrity (`TEST-30` & core flows) | `src/services/__tests__/mockService.test.ts` | 6 | User isolation on logout/switch, expired subscription zero usage & create block, `idempotencyKey` dedupe & Fanpage `canPublish=true`, many-to-many collections, non-auto-paid customer status check, admin self-lock / non-destructive disconnect / revoked device block |
+| Task State Machine | `src/utils/__tests__/taskStatus.test.ts` | 5 | All 10 `TaskStatus` aggregate derivations, pause/resume, per-item confirm, cancel (`PROCESSING -> NEEDS_REVIEW`), retry only `FAILED` |
+| Validation Utilities | `src/utils/__tests__/validationAndCsv.test.ts` | 2 | Text/link/media-only post validation, Facebook group URL normalization & numeric UID extraction |
+| CSV Import & Safe Export | `src/utils/__tests__/validationAndCsv.test.ts` | 2 | RFC-4180 CSV row classification (`VALID`/`DUPLICATE`/`ERROR`), CSV formula-injection neutralization |
+| DateTime & Device Formatters | `src/utils/__tests__/validationAndCsv.test.ts` | 3 | GMT+7 conversion & future timestamp check, countdown & dynamic month grid, device connection status derivation |
 
-## 3. Headless Chromium Browser Verification (`playwright-cli`)
-Verified live against `http://localhost:3000` at `1440×900` with **0 console errors and 0 warnings**:
-- Unauthenticated `/` redirects to `/login` with empty password field and explicit DEMO buttons.
-- Demo Customer login navigates to `/post`, hides Admin nav link, renders all 10 draft slots (`Bài 1..10`) in a 2×5 grid, zero horizontal overflow.
-- Direct Customer navigation to `/admin` renders **Không có quyền truy cập** Access Denied screen.
-- `/dashboard` renders dynamic current-year/current-month calendar, real computed KPIs, all 10 status filter chips, and opens reactive `TaskDrawer`.
-- `/accounts` renders Facebook accounts, Fanpages (`canPublish` badges), and Extension devices with zero out-of-scope cookie/ping fields.
-- `/pricing` renders exact usage counters, live synced plans, and placeholder **QR DEMO** checkout.
-- `/extension-preview` renders 385×560px preview frame, 9 UI scenarios, and legal action buttons without out-of-scope automation terms.
-- Demo Admin login navigates to `/admin`, renders all 5 header nav items without overlap (`navOverlap: false`), and displays the 4 scoped tabs (`Tổng quan`, `Người dùng`, `Gói dịch vụ`, `Thanh toán`).
+## 3. Real Browser E2E Behavioral & Multi-Viewport Visual QA (Headless Chromium via `playwright-cli`)
+- **Console / Uncaught Page Errors**: **0** across all tested routes (`/login`, `/post`, `/dashboard`, `/accounts`, `/pricing`, `/admin`, `/extension-preview`).
+- **Verified Interactive Flows**:
+  1. `/login`: DEMO security notice displayed (`"Không sử dụng mật khẩu thật"`), quick DEMO logins functional.
+  2. `TEST-31` (`/post`): Added `Nhóm QA Reactive V3`, edited to `Nhóm QA Reactive Edited`, deleted group — every change reflected instantaneously in the DOM without browser reload.
+  3. `TEST-34` (`/post`): Unchecked all 10 draft checkboxes — remained at 0 selected with zero auto-reselection.
+  4. `TEST-35` (`/post`): Checked Draft 1 → assigned 1 group; checked Draft 2 → assigned 1 different group → primary CTA & `ConfirmPublishModal` confirmed exact **2 items** (never Cartesian 4).
+  5. `TEST-45/46/47` (`/post` → `/dashboard` reload → `TaskDrawer`): Uploaded real `qa-banner.png` (PNG) in Draft 1, created task, navigated to `/dashboard`, executed full `page.reload()`, opened `TaskDrawer`, verified `<img alt="qa-banner.png">` rendered intact (`complete === true && naturalWidth > 0`) from IndexedDB.
+  6. `TEST-32 & TEST-33` (`TaskDrawer`): Confirmed item #1 inside open `TaskDrawer` → progress updated immediately to `1/2 (50%)` and item badge updated to `Thành công` without reload.
+  7. `TEST-48` (`/extension-preview`): Rendered cleanly with strict `getEligibleExtensionSelection`.
+  8. `TEST-49` (`/admin` → `/pricing`): Admin updated `Gói Chuyên Nghiệp` monthly price to `555.000đ` → navigated to `/pricing` → `555.000đ/tháng` and official `Tác vụ đang chờ lịch (SCHEDULED)` quota bar rendered immediately.
+- **Multi-Viewport Layout & Horizontal Overflow Audit**: **25 / 25 checks PASSED with `0px` horizontal overflow** across:
+  - Desktop: `1920×1080`, `1440×900`, `1366×768`
+  - Tablet: `768×1024`
+  - Mobile: `390×844`
+  - Routes checked at every viewport: `/post`, `/dashboard`, `/accounts`, `/pricing`, `/admin`.

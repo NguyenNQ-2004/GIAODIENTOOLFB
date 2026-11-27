@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ConnectAccountModal } from '../components/ConnectAccountModal';
 import { ExtensionGuideModal } from '../components/ExtensionGuideModal';
+import { IS_DEV_OR_DEMO } from '../config/demoConfig';
 import { useApp } from '../state/AppContext';
 import type {
   DeviceConnectionStatus,
@@ -306,13 +307,15 @@ export const AccountsPage: React.FC = () => {
               Trạng thái thiết bị được tính từ thời điểm hoạt động gần nhất và trạng thái thu hồi.
             </p>
           </div>
-          <Link
-            to="/extension-preview"
-            className="text-xs font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"
-          >
-            Xem trước Extension Popup
-            <span className="material-symbols-outlined text-[15px]">open_in_new</span>
-          </Link>
+          {IS_DEV_OR_DEMO && (
+            <Link
+              to="/extension-preview"
+              className="text-xs font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"
+            >
+              Xem trước Extension Popup
+              <span className="material-symbols-outlined text-[15px]">open_in_new</span>
+            </Link>
+          )}
         </div>
 
         {devices.length === 0 ? (
@@ -391,8 +394,12 @@ export const AccountsPage: React.FC = () => {
         onCancel={() => setDisconnectTarget(null)}
         onConfirm={() => {
           if (disconnectTarget) {
-            disconnectAccount(disconnectTarget.id);
-            addToast('info', 'Đã ngắt kết nối hồ sơ', disconnectTarget.displayName);
+            const res = disconnectAccount(disconnectTarget.id);
+            if (!res.ok) {
+              addToast('error', 'Không thể ngắt kết nối', res.error);
+            } else {
+              addToast('info', 'Đã ngắt kết nối hồ sơ', disconnectTarget.displayName);
+            }
           }
           setDisconnectTarget(null);
         }}
@@ -406,8 +413,12 @@ export const AccountsPage: React.FC = () => {
         onCancel={() => setRevokeTarget(null)}
         onConfirm={() => {
           if (revokeTarget) {
-            revokeDevice(revokeTarget.id);
-            addToast('warning', 'Đã thu hồi thiết bị', revokeTarget.deviceName);
+            const res = revokeDevice(revokeTarget.id);
+            if (!res.ok) {
+              addToast('error', 'Không thể thu hồi thiết bị', res.error);
+            } else {
+              addToast('warning', 'Đã thu hồi thiết bị', revokeTarget.deviceName);
+            }
           }
           setRevokeTarget(null);
         }}

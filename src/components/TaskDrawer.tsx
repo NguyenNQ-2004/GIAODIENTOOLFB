@@ -1,18 +1,27 @@
 import React, { useEffect, useState } from 'react';
+import { IS_DEMO_MODE } from '../config/demoConfig';
 import { useApp } from '../state/AppContext';
 import type { PublishingTaskItem, TaskItemStatus } from '../types/domain';
-import { formatVietnamDateTime } from '../utils/dateTime';
+import {
+  formatVietnamDateTime,
+  getDefaultFutureLocalDateTime,
+  isoToVietnamDatetimeLocal,
+  vietnamDatetimeLocalToIso,
+} from '../utils/dateTime';
 import {
   canCancelTask,
   canConfirmItem,
   canPauseTask,
+  canRescheduleTask,
   canResumeTask,
   canRetryItem,
   getTaskProgress,
+  isScheduledTaskOverdue,
   TASK_ITEM_STATUS_META,
   TASK_STATUS_META,
 } from '../utils/taskStatus';
 import { ConfirmDialog } from './ConfirmDialog';
+import { MediaPreview } from './MediaPreview';
 
 interface TaskDrawerProps {
   taskId: string | null;
@@ -23,6 +32,8 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ taskId, onClose }) => {
   const {
     tasks,
     accounts,
+    rescheduleTask,
+    triggerDueScheduledTaskDemo,
     pauseTask,
     resumeTask,
     cancelTask,
@@ -33,6 +44,8 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ taskId, onClose }) => {
   } = useApp();
 
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleLocal, setRescheduleLocal] = useState('');
   const [confirmingItem, setConfirmingItem] = useState<PublishingTaskItem | null>(null);
   const [itemOutcome, setItemOutcome] = useState<
     Extract<TaskItemStatus, 'SUCCESS' | 'FAILED' | 'NEEDS_REVIEW'>
@@ -62,6 +75,31 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ taskId, onClose }) => {
   const progress = getTaskProgress(task.items);
   const statusMeta = TASK_STATUS_META[task.status];
   const account = accounts.find((a) => a.id === task.facebookAccountId) ?? null;
+  const overdue = isScheduledTaskOverdue(task);
+
+  const handleOpenReschedule = () => {
+    const initialLocal = task.scheduledAt
+      ? isoToVietnamDatetimeLocal(task.scheduledAt)
+      : getDefaultFutureLocalDateTime();
+    setRescheduleLocal(initialLocal || getDefaultFutureLocalDateTime());
+    setRescheduleOpen(true);
+  };
+
+  const handleSubmitReschedule = (e: React.FormEvent) => {
+    e.preventDefault();
+    const nextIso = vietnamDatetimeLocalToIso(rescheduleLocal);
+    if (!nextIso) {
+      addToast('error', 'Thời gian lịch mới không hợp lệ.');
+      return;
+    }
+    const res = rescheduleTask({ taskId: task.id, scheduledAt: nextIso });
+    if (!res.ok) {
+      addToast('error', 'Không thể đổi lịch tác vụ', res.error);
+      return;
+    }
+    setRescheduleOpen(false);
+    addToast('success', 'Đã cập nhật lịch đăng mới', formatVietnamDateTime(nextIso));
+  };
 
   const openConfirmModal = (item: PublishingTaskItem) => {
     setConfirmingItem(item);
@@ -116,6 +154,11 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ taskId, onClose }) => {
               >
                 {statusMeta.label}
               </span>
+              {overdue && (
+                <span className="px-2 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-800 text-[10px] font-bold">
+                  Quá giờ lịch
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-500 font-mono mt-1 truncate">ID: {task.id}</p>
           </div>
@@ -179,13 +222,75 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ taskId, onClose }) => {
             </div>
           </div>
 
+          {/* Contextual Mode / Overdue Notice */}
+          {task.executionMode === 'META_PAGE_API' && (
+            <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-900 flex items-start gap-2">
+              <span className="material-symbols-outlined text-[16px] text-blue-600 mt-0.5 shrink-0">
+                api
+              </span>
+              <span>
+                Tác vụ Fanpage sử dụng chế độ <strong>META_PAGE_API</strong>. Trạng thái thành công/thất
+                bại phải đến từ phản hồi Meta Graph API trên backend — không dùng nút xác nhận thủ công
+                (USER).
+              </span>
+            </div>
+          )}
+
+          {overdue && (
+            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+              <span className="material-symbols-outlined text-[16px] text-amber-600 mt-0.5 shrink-0">
+                schedule
+              </span>
+              <span>
+                Tác vụ này đã quá thời điểm hẹn giờ nhưng chưa được backend scheduler kích hoạt (chế độ
+                DEMO không có cron server chạy nền). Bạn có thể đổi lịch mới hoặc kích hoạt mô phỏng bên
+                dưới.
+              </span>
+            </div>
+          )}
+
           {/* Task-level Actions */}
           <div className="flex flex-wrap items-center gap-2">
+            {canRescheduleTask(task) && (
+              <button
+                type="button"
+                onClick={handleOpenReschedule}
+                className="h-9 px-3.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]">edit_calendar</span>
+                Đổi lịch
+              </button>
+            )}
+            {IS_DEMO_MODE && task.status === 'SCHEDULED' && (
+              <button
+                type="button"
+                onClick={() => {
+                  const res = triggerDueScheduledTaskDemo(task.id);
+                  if (!res.ok) {
+                    addToast('error', 'Không thể kích hoạt lịch (DEMO)', res.error);
+                    return;
+                  }
+                  addToast(
+                    'success',
+                    'Đã mô phỏng đến giờ chạy (DEMO)',
+                    `Tác vụ đã chuyển sang trạng thái ${TASK_STATUS_META[res.data!.status].label}.`
+                  );
+                }}
+                className="h-9 px-3.5 rounded-lg border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-semibold inline-flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]">play_circle</span>
+                Mô phỏng đến giờ chạy (DEMO)
+              </button>
+            )}
             {canPauseTask(task) && (
               <button
                 type="button"
                 onClick={() => {
-                  pauseTask(task.id);
+                  const res = pauseTask(task.id);
+                  if (!res.ok) {
+                    addToast('error', 'Không thể tạm dừng', res.error);
+                    return;
+                  }
                   addToast('info', 'Đã tạm dừng tác vụ', 'Trạng thái đã chuyển sang Tạm dừng (PAUSED).');
                 }}
                 className="h-9 px-3.5 rounded-lg border border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-800 text-xs font-semibold inline-flex items-center gap-1.5"
@@ -198,7 +303,11 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ taskId, onClose }) => {
               <button
                 type="button"
                 onClick={() => {
-                  resumeTask(task.id);
+                  const res = resumeTask(task.id);
+                  if (!res.ok) {
+                    addToast('error', 'Không thể tiếp tục tác vụ', res.error);
+                    return;
+                  }
                   addToast('success', 'Đã tiếp tục tác vụ');
                 }}
                 className="h-9 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5"
@@ -207,7 +316,7 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ taskId, onClose }) => {
                 Tiếp tục tác vụ
               </button>
             )}
-            {progress.failed > 0 && (
+            {progress.failed > 0 && task.status !== 'PAUSED' && task.status !== 'CANCELLED' && (
               <button
                 type="button"
                 onClick={() => {
@@ -238,6 +347,40 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ taskId, onClose }) => {
               </button>
             )}
           </div>
+
+          {/* Inline Reschedule Form */}
+          {rescheduleOpen && (
+            <form
+              onSubmit={handleSubmitReschedule}
+              className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-end gap-2.5"
+            >
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  Chọn thời điểm hẹn giờ mới (GMT+7)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={rescheduleLocal}
+                  onChange={(e) => setRescheduleLocal(e.target.value)}
+                  required
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs"
+                />
+              </div>
+              <button
+                type="submit"
+                className="h-9 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+              >
+                Lưu lịch mới
+              </button>
+              <button
+                type="button"
+                onClick={() => setRescheduleOpen(false)}
+                className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-semibold"
+              >
+                Đóng
+              </button>
+            </form>
+          )}
 
           {/* Per-Item List */}
           <div className="space-y-3">
@@ -291,7 +434,7 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ taskId, onClose }) => {
                         <span className="material-symbols-outlined text-[15px]">open_in_new</span>
                         Mở đích
                       </a>
-                      {canConfirmItem(item) && (
+                      {canConfirmItem(task, item) && (
                         <button
                           type="button"
                           onClick={() => openConfirmModal(item)}
@@ -301,7 +444,7 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ taskId, onClose }) => {
                           Xác nhận
                         </button>
                       )}
-                      {canRetryItem(item) && (
+                      {canRetryItem(task, item) && (
                         <button
                           type="button"
                           onClick={() => {
@@ -322,7 +465,7 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ taskId, onClose }) => {
                   </div>
 
                   {/* Immutable Snapshot Preview */}
-                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs text-slate-700 space-y-1.5">
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs text-slate-700 space-y-2">
                     <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
                       Bản chụp nội dung (Snapshot bất biến)
                     </p>
@@ -335,10 +478,26 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ taskId, onClose }) => {
                       </p>
                     )}
                     {item.mediaSnapshots.length > 0 && (
-                      <p className="text-[11px] text-slate-500">
-                        Đính kèm: {item.mediaSnapshots.length} tệp media (
-                        {item.mediaSnapshots.map((m) => m.originalName).join(', ')})
-                      </p>
+                      <div className="space-y-1.5 pt-1">
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          Media đính kèm ({item.mediaSnapshots.length} tệp):
+                        </p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {item.mediaSnapshots.map((m) => (
+                            <div
+                              key={m.id}
+                              className="rounded-lg border border-slate-200 bg-white overflow-hidden"
+                            >
+                              <div className="aspect-video bg-slate-100 overflow-hidden">
+                                <MediaPreview media={m} className="w-full h-full object-cover" />
+                              </div>
+                              <p className="px-2 py-1 text-[10px] text-slate-600 truncate">
+                                {m.originalName}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
 
@@ -483,8 +642,12 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ taskId, onClose }) => {
         confirmLabel="Xác nhận hủy tác vụ"
         onCancel={() => setConfirmCancelOpen(false)}
         onConfirm={() => {
-          cancelTask(task.id);
+          const res = cancelTask(task.id);
           setConfirmCancelOpen(false);
+          if (!res.ok) {
+            addToast('error', 'Không thể hủy tác vụ', res.error);
+            return;
+          }
           addToast('warning', 'Đã hủy tác vụ', 'Lịch sử các mục đã hoàn thành vẫn được bảo toàn.');
         }}
       />

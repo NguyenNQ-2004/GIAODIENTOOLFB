@@ -99,23 +99,17 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
   const nowIso = baseDate.toISOString();
   const createdPast = addDaysIso(-45, baseDate);
 
+  // Canonical Plan entities — strictly approved fields only (no description/features columns)
   const plans: Plan[] = [
     {
       id: 'plan-basic',
       code: 'BASIC',
       name: 'Gói Cơ Bản',
-      description: 'Phù hợp cho cá nhân bắt đầu quản lý nội dung và nhóm Facebook.',
-      priceMonthlyVnd: 199000,
-      priceYearlyVnd: 1990000,
+      monthlyPriceVnd: 199000,
+      yearlyPriceVnd: 1990000,
       maxFacebookAccounts: 2,
-      maxGroups: 50,
-      maxScheduledTasksPerDay: 15,
-      features: [
-        'Quản lý tối đa 2 hồ sơ Facebook',
-        'Lưu trữ đến 50 nhóm & bộ sưu tập nhóm',
-        'Tối đa 15 tác vụ lên lịch mỗi ngày',
-        'Hỗ trợ nhập/xuất danh sách nhóm bằng CSV',
-      ],
+      maxSavedGroups: 50,
+      maxScheduledTasks: 10,
       isActive: true,
       createdAt: createdPast,
       updatedAt: createdPast,
@@ -124,18 +118,11 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
       id: 'plan-pro',
       code: 'PRO',
       name: 'Gói Chuyên Nghiệp',
-      description: 'Dành cho đội ngũ bán hàng cần quản lý nhiều nhóm và Fanpage.',
-      priceMonthlyVnd: 499000,
-      priceYearlyVnd: 4990000,
+      monthlyPriceVnd: 499000,
+      yearlyPriceVnd: 4990000,
       maxFacebookAccounts: 10,
-      maxGroups: 500,
-      maxScheduledTasksPerDay: 100,
-      features: [
-        'Quản lý tối đa 10 hồ sơ Facebook & Fanpage',
-        'Lưu trữ đến 500 nhóm không giới hạn bộ sưu tập',
-        'Tối đa 100 tác vụ lên lịch mỗi ngày',
-        'Hỗ trợ đăng bài Fanpage & theo dõi xác nhận chi tiết',
-      ],
+      maxSavedGroups: 500,
+      maxScheduledTasks: 50,
       isActive: true,
       createdAt: createdPast,
       updatedAt: createdPast,
@@ -144,18 +131,11 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
       id: 'plan-agency',
       code: 'AGENCY',
       name: 'Gói Doanh Nghiệp',
-      description: 'Hạn mức mở rộng cho agency và hệ thống phân phối đa kênh.',
-      priceMonthlyVnd: 1290000,
-      priceYearlyVnd: 12900000,
+      monthlyPriceVnd: 1290000,
+      yearlyPriceVnd: 12900000,
       maxFacebookAccounts: 30,
-      maxGroups: 2000,
-      maxScheduledTasksPerDay: 500,
-      features: [
-        'Quản lý tối đa 30 hồ sơ Facebook & Fanpage',
-        'Lưu trữ đến 2.000 nhóm Facebook',
-        'Tối đa 500 tác vụ lên lịch mỗi ngày',
-        'Ưu tiên hỗ trợ kỹ thuật & xuất báo cáo lịch sử',
-      ],
+      maxSavedGroups: 2000,
+      maxScheduledTasks: 200,
       isActive: true,
       createdAt: createdPast,
       updatedAt: createdPast,
@@ -166,7 +146,7 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
     {
       id: 'user-customer-pro',
       email: 'customer@demo.fbpostpro.local',
-      fullName: 'Nguyễn Minh Quân',
+      displayName: 'Nguyễn Minh Quân',
       avatarUrl: null,
       role: 'CUSTOMER',
       status: 'ACTIVE',
@@ -178,7 +158,7 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
     {
       id: 'user-customer-expired',
       email: 'expired@demo.fbpostpro.local',
-      fullName: 'Trần Thảo Vy',
+      displayName: 'Trần Thảo Vy',
       avatarUrl: null,
       role: 'CUSTOMER',
       status: 'ACTIVE',
@@ -190,7 +170,7 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
     {
       id: 'user-admin',
       email: 'admin@demo.fbpostpro.local',
-      fullName: 'Lê Hoàng Nam',
+      displayName: 'Lê Hoàng Nam',
       avatarUrl: null,
       role: 'ADMIN',
       status: 'ACTIVE',
@@ -207,9 +187,9 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
       userId: 'user-customer-pro',
       planId: 'plan-pro',
       billingPeriod: 'MONTHLY',
-      status: 'ACTIVE',
       startsAt: addDaysIso(-12, baseDate),
-      endsAt: addDaysIso(18, baseDate),
+      expiresAt: addDaysIso(18, baseDate),
+      status: 'ACTIVE',
       createdAt: addDaysIso(-12, baseDate),
       updatedAt: addDaysIso(-12, baseDate),
     },
@@ -218,9 +198,9 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
       userId: 'user-customer-expired',
       planId: 'plan-basic',
       billingPeriod: 'MONTHLY',
-      status: 'EXPIRED',
       startsAt: addDaysIso(-40, baseDate),
-      endsAt: addDaysIso(-10, baseDate),
+      expiresAt: addDaysIso(-10, baseDate),
+      status: 'EXPIRED',
       createdAt: addDaysIso(-40, baseDate),
       updatedAt: addDaysIso(-10, baseDate),
     },
@@ -229,9 +209,9 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
       userId: 'user-admin',
       planId: 'plan-agency',
       billingPeriod: 'YEARLY',
-      status: 'ACTIVE',
       startsAt: addDaysIso(-30, baseDate),
-      endsAt: addDaysIso(335, baseDate),
+      expiresAt: addDaysIso(335, baseDate),
+      status: 'ACTIVE',
       createdAt: addDaysIso(-30, baseDate),
       updatedAt: addDaysIso(-30, baseDate),
     },
@@ -388,7 +368,6 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
     },
   ];
 
-  // Many-to-many: grp-1 belongs to BOTH col-1 and col-2
   const collectionItems: GroupCollectionItem[] = [
     { collectionId: 'col-1', groupId: 'grp-1', createdAt: addDaysIso(-15, baseDate) },
     { collectionId: 'col-1', groupId: 'grp-2', createdAt: addDaysIso(-15, baseDate) },
@@ -429,7 +408,6 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
     },
   ];
 
-  // Task 1: WAITING_CONFIRMATION (Manual group posting — 1 SUCCESS, 1 WAITING_CONFIRMATION)
   const task1Items: PublishingTask['items'] = [
     {
       id: 'ti-101',
@@ -481,7 +459,6 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
     },
   ];
 
-  // Task 2: SCHEDULED (Future timestamp in current month/year)
   const scheduledFutureIso = addMinutesIso(180, baseDate);
   const task2Items: PublishingTask['items'] = [
     {
@@ -534,23 +511,22 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
     },
   ];
 
-  // Task 3: PARTIAL_FAILED (1 SUCCESS + 1 FAILED eligible for retry)
   const task3Items: PublishingTask['items'] = [
     {
       id: 'ti-301',
       taskId: 'task-301',
       sourcePostId: 'saved-post-1',
-      groupId: null,
-      pageId: 'fb-page-1',
+      groupId: 'grp-1',
+      pageId: null,
       contentSnapshot: 'Combo 3 sản phẩm nhà bếp tối giản — bảo hành chính hãng 12 tháng.',
       linkSnapshot: 'https://example.com/combo-gia-dung',
-      destinationNameSnapshot: 'Gia Dụng Thông Minh Minh Quân',
-      destinationUrlSnapshot: 'https://www.facebook.com/giadungminhquan',
+      destinationNameSnapshot: 'Cộng Đồng Bán Hàng Online TP.HCM',
+      destinationUrlSnapshot: 'https://www.facebook.com/groups/384920192837465',
       mediaSnapshots: [],
       status: 'SUCCESS',
-      confirmationType: 'API',
-      resultPostUrl: 'https://www.facebook.com/giadungminhquan/posts/1029384756',
-      externalPostId: '105829301928374_1029384756',
+      confirmationType: 'USER',
+      resultPostUrl: 'https://www.facebook.com/groups/384920192837465/posts/1029384756',
+      externalPostId: null,
       errorCode: null,
       errorMessage: null,
       attemptCount: 1,
@@ -584,7 +560,6 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
     },
   ];
 
-  // Task 4: COMPLETED (2 days ago)
   const task4Items: PublishingTask['items'] = [
     {
       id: 'ti-401',
@@ -611,7 +586,6 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
     },
   ];
 
-  // Task 5: SCHEDULED next day for calendar visibility
   const scheduledTomorrowIso = addDaysIso(1, baseDate);
   const task5Items: PublishingTask['items'] = [
     {
@@ -757,9 +731,9 @@ export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabas
     {
       id: 'ord-pending-1',
       userId: 'user-customer-pro',
-      planId: 'plan-agency',
+      planId: 'plan-pro',
       orderCode: 'FPP-DEMO-202602',
-      amountVnd: 1290000,
+      amountVnd: 499000,
       billingPeriod: 'MONTHLY',
       paymentMethod: 'VIETQR',
       providerReference: null,

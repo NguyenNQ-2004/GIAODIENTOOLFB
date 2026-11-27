@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { MediaPreview } from '../components/MediaPreview';
 import { CollectionModal } from '../components/composer/CollectionModal';
 import {
   ConfirmPublishModal,
@@ -8,6 +9,7 @@ import {
 } from '../components/composer/ConfirmPublishModal';
 import { CsvImportModal } from '../components/composer/CsvImportModal';
 import { GroupFormModal } from '../components/composer/GroupFormModal';
+import { demoMediaStorage } from '../services/mediaStorage';
 import { useApp } from '../state/AppContext';
 import type {
   FacebookGroup,
@@ -33,6 +35,7 @@ import {
 export const PostComposerPage: React.FC = () => {
   const navigate = useNavigate();
   const {
+    currentUser,
     accounts,
     pages,
     groups,
@@ -56,9 +59,10 @@ export const PostComposerPage: React.FC = () => {
     createTask,
   } = useApp();
 
-  // Separate editing slot vs selected drafts for publishing
+  // Separate editing slot vs explicitly selected drafts for publishing
   const [activeSlotNumber, setActiveSlotNumber] = useState<number>(1);
   const [selectedDraftIds, setSelectedDraftIds] = useState<string[]>([]);
+  const initializedUserRef = useRef<string | null>(null);
 
   // Account & Destination mode
   const [selectedAccountId, setSelectedAccountId] = useState<string>(
@@ -66,9 +70,9 @@ export const PostComposerPage: React.FC = () => {
   );
   const [targetType, setTargetType] = useState<TaskTargetType>('GROUP');
 
-  // Destination selections (separate UI state — never stored on FacebookGroup)
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
-  const [selectedPageIds, setSelectedPageIds] = useState<string[]>([]);
+  // Per-draft destination assignments (strictly avoids implicit Cartesian multiplication)
+  const [groupIdsByDraftId, setGroupIdsByDraftId] = useState<Record<string, string[]>>({});
+  const [pageIdsByDraftId, setPageIdsByDraftId] = useState<Record<string, string[]>>({});
 
   // Group filtering
   const [groupSearch, setGroupSearch] = useState('');
@@ -101,48 +105,61 @@ export const PostComposerPage: React.FC = () => {
   const [pendingScheduledIso, setPendingScheduledIso] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const createdObjectUrlsRef = useRef<Set<string>>(new Set());
-
-  // Clean up object URLs on unmount
-  useEffect(() => {
-    const urls = createdObjectUrlsRef.current;
-    return () => {
-      urls.forEach((url) => URL.revokeObjectURL(url));
-      urls.clear();
-    };
-  }, []);
 
   // Keep selectedAccountId valid when accounts list changes (e.g., user switch)
   useEffect(() => {
     if (accounts.length === 0) {
       setSelectedAccountId('');
-      setSelectedPageIds([]);
+      setPageIdsByDraftId({});
       return;
     }
     if (!accounts.some((a) => a.id === selectedAccountId)) {
       const preferred = accounts.find((a) => a.status !== 'DISCONNECTED') ?? accounts[0];
       setSelectedAccountId(preferred.id);
-      setSelectedPageIds([]);
+      setPageIdsByDraftId({});
     }
   }, [accounts, selectedAccountId]);
 
-  // Keep selectedGroupIds pruned if groups are deleted or user changes
+  // Prune deleted group IDs from all per-draft group assignments
   useEffect(() => {
     const validIds = new Set(groups.map((g) => g.id));
-    setSelectedGroupIds((prev) => prev.filter((id) => validIds.has(id)));
+    setGroupIdsByDraftId((prev) => {
+      let changed = false;
+      const next: Record<string, string[]> = {};
+      for (const [draftId, ids] of Object.entries(prev)) {
+        const filtered = ids.filter((id) => validIds.has(id));
+        if (filtered.length !== ids.length) changed = true;
+        if (filtered.length > 0) next[draftId] = filtered;
+      }
+      return changed ? next : prev;
+    });
   }, [groups]);
 
-  // Default select draft #1 if it has content and nothing selected yet
+  // One-time default draft selection per signed-in user (never re-checks after user unchecks all)
   useEffect(() => {
-    if (selectedDraftIds.length === 0 && draftPosts.length > 0) {
-      const firstValid = draftPosts.find((d) => hasPublishableContent(d));
-      if (firstValid) setSelectedDraftIds([firstValid.id]);
-    }
-  }, [draftPosts, selectedDraftIds.length]);
+    const uid = currentUser?.id ?? null;
+    if (!uid || draftPosts.length === 0) return;
+    if (initializedUserRef.current === uid) return;
+    initializedUserRef.current = uid;
+    const firstValid = draftPosts.find((d) => hasPublishableContent(d));
+    setSelectedDraftIds(firstValid ? [firstValid.id] : []);
+    setGroupIdsByDraftId({});
+    setPageIdsByDraftId({});
+  }, [currentUser?.id, draftPosts]);
 
   const activeDraft: Post | undefined = useMemo(
     () => draftPosts.find((d) => d.slotNumber === activeSlotNumber) ?? draftPosts[0],
     [draftPosts, activeSlotNumber]
+  );
+
+  const activeDraftId = activeDraft?.id ?? '';
+  const selectedGroupIds = useMemo(
+    () => (activeDraftId ? groupIdsByDraftId[activeDraftId] ?? [] : []),
+    [groupIdsByDraftId, activeDraftId]
+  );
+  const selectedPageIds = useMemo(
+    () => (activeDraftId ? pageIdsByDraftId[activeDraftId] ?? [] : []),
+    [pageIdsByDraftId, activeDraftId]
   );
 
   const selectedAccount = useMemo(
@@ -209,7 +226,7 @@ export const PostComposerPage: React.FC = () => {
   const handleAccountChange = (newAccountId: string) => {
     setSelectedAccountId(newAccountId);
     // Clear invalid Fanpage selections immediately when switching account
-    setSelectedPageIds([]);
+    setPageIdsByDraftId({});
   };
 
   const toggleDraftSelection = (postId: string) => {
@@ -218,7 +235,7 @@ export const PostComposerPage: React.FC = () => {
     );
   };
 
-  const handleMediaFiles = (fileList: FileList | null) => {
+  const handleMediaFiles = async (fileList: FileList | null) => {
     if (!fileList || !activeDraft) return;
     const files = Array.from(fileList);
     const currentMedia = activeDraft.media;
@@ -235,16 +252,20 @@ export const PostComposerPage: React.FC = () => {
         addToast('error', 'Tệp không hợp lệ', check.error);
         continue;
       }
-      const objectUrl = URL.createObjectURL(file);
-      createdObjectUrlsRef.current.add(objectUrl);
+      const mediaId = generateId();
+      await demoMediaStorage.saveMediaBlob(mediaId, file, {
+        mimeType: file.type,
+        originalName: file.name,
+      });
       nextItems.push({
-        id: generateId(),
+        id: mediaId,
         originalName: file.name,
         mimeType: file.type,
         sizeBytes: file.size,
         mediaType: check.mediaType,
         status: 'READY',
-        previewUrl: objectUrl,
+        // Never persist ephemeral blob: URLs in localStorage; MediaPreview resolves via IndexedDB by media.id
+        previewUrl: null,
         sortOrder: currentMedia.length + nextItems.length,
       });
     }
@@ -253,26 +274,14 @@ export const PostComposerPage: React.FC = () => {
       updateDraftSlot(activeSlotNumber, {
         media: [...currentMedia, ...nextItems],
       });
-      if (!selectedDraftIds.includes(activeDraft.id)) {
-        setSelectedDraftIds((prev) => [...prev, activeDraft.id]);
-      }
     }
   };
 
   const handleRemoveMedia = (mediaId: string) => {
     if (!activeDraft) return;
-    const target = activeDraft.media.find((m) => m.id === mediaId);
-    if (target?.previewUrl && createdObjectUrlsRef.current.has(target.previewUrl)) {
-      // Only revoke if no saved post references the same blob URL
-      const usedElsewhere = savedPosts.some((sp) =>
-        sp.media.some((m) => m.previewUrl === target.previewUrl)
-      );
-      if (!usedElsewhere) {
-        URL.revokeObjectURL(target.previewUrl);
-        createdObjectUrlsRef.current.delete(target.previewUrl);
-      }
-    }
     const nextMedia = activeDraft.media.filter((m) => m.id !== mediaId);
+    // mockAppService checks isMediaReferenced() across all drafts, saved posts, and task snapshots
+    // before deleting the underlying blob from demoMediaStorage.
     updateDraftSlot(activeSlotNumber, { media: nextMedia });
   };
 
@@ -322,18 +331,71 @@ export const PostComposerPage: React.FC = () => {
   };
 
   const handleToggleGroup = (groupId: string) => {
-    setSelectedGroupIds((prev) =>
-      prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]
-    );
+    if (!activeDraftId) return;
+    setGroupIdsByDraftId((prev) => {
+      const current = prev[activeDraftId] ?? [];
+      const next = current.includes(groupId)
+        ? current.filter((id) => id !== groupId)
+        : [...current, groupId];
+      return { ...prev, [activeDraftId]: next };
+    });
   };
 
   const handleToggleAllVisibleGroups = () => {
+    if (!activeDraftId) return;
     const visibleIds = filteredGroups.map((g) => g.id);
-    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedGroupIds.includes(id));
-    if (allSelected) {
-      setSelectedGroupIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+    const allSelected =
+      visibleIds.length > 0 && visibleIds.every((id) => selectedGroupIds.includes(id));
+    setGroupIdsByDraftId((prev) => {
+      const current = prev[activeDraftId] ?? [];
+      const next = allSelected
+        ? current.filter((id) => !visibleIds.includes(id))
+        : Array.from(new Set([...current, ...visibleIds]));
+      return { ...prev, [activeDraftId]: next };
+    });
+  };
+
+  const handleTogglePage = (pageId: string) => {
+    if (!activeDraftId) return;
+    setPageIdsByDraftId((prev) => {
+      const current = prev[activeDraftId] ?? [];
+      const next = current.includes(pageId)
+        ? current.filter((id) => id !== pageId)
+        : [...current, pageId];
+      return { ...prev, [activeDraftId]: next };
+    });
+  };
+
+  const handleCopyActiveDestinationsToSelectedDrafts = () => {
+    if (!activeDraftId || selectedDraftIds.length <= 1) return;
+    if (targetType === 'GROUP') {
+      const source = groupIdsByDraftId[activeDraftId] ?? [];
+      setGroupIdsByDraftId((prev) => {
+        const next = { ...prev };
+        for (const id of selectedDraftIds) {
+          next[id] = [...source];
+        }
+        return next;
+      });
+      addToast(
+        'info',
+        'Đã sao chép danh sách nhóm đích',
+        `Áp dụng ${source.length} nhóm từ Bài #${activeSlotNumber} cho ${selectedDraftIds.length} bài đang chọn.`
+      );
     } else {
-      setSelectedGroupIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+      const source = pageIdsByDraftId[activeDraftId] ?? [];
+      setPageIdsByDraftId((prev) => {
+        const next = { ...prev };
+        for (const id of selectedDraftIds) {
+          next[id] = [...source];
+        }
+        return next;
+      });
+      addToast(
+        'info',
+        'Đã sao chép Fanpage đích',
+        `Áp dụng ${source.length} Fanpage từ Bài #${activeSlotNumber} cho ${selectedDraftIds.length} bài đang chọn.`
+      );
     }
   };
 
@@ -376,17 +438,14 @@ export const PostComposerPage: React.FC = () => {
       return;
     }
 
-    // Gather selected drafts (fallback to activeDraft if none checked explicitly)
-    const chosenDraftIds =
-      selectedDraftIds.length > 0
-        ? selectedDraftIds
-        : activeDraft
-        ? [activeDraft.id]
-        : [];
-    const chosenDrafts = draftPosts.filter((d) => chosenDraftIds.includes(d.id));
-
+    // Strictly respect user's draft checkboxes — never silently publish unselected drafts
+    const chosenDrafts = draftPosts.filter((d) => selectedDraftIds.includes(d.id));
     if (chosenDrafts.length === 0) {
-      addToast('error', 'Chưa chọn bài viết nào.');
+      addToast(
+        'error',
+        'Chưa chọn bài viết nào',
+        'Hãy tích chọn ít nhất 1 khung bài nháp ở danh sách Bài 1..10.'
+      );
       return;
     }
 
@@ -398,7 +457,7 @@ export const PostComposerPage: React.FC = () => {
       }
     }
 
-    // Validate schedule timestamp if SCHEDULE
+    // Validate schedule timestamp & concurrent SCHEDULED quota if SCHEDULE
     let scheduledIso: string | null = null;
     if (publishMode === 'SCHEDULE') {
       const converted = vietnamDatetimeLocalToIso(scheduleLocal);
@@ -410,19 +469,33 @@ export const PostComposerPage: React.FC = () => {
         );
         return;
       }
+      if (usageSummary.scheduledTasksUsed >= usageSummary.scheduledTasksLimit) {
+        addToast(
+          'error',
+          'Đã đạt giới hạn tác vụ đang chờ lịch',
+          `Gói hiện tại cho phép tối đa ${usageSummary.scheduledTasksLimit} tác vụ ở trạng thái SCHEDULED cùng lúc.`
+        );
+        return;
+      }
       scheduledIso = converted;
     }
 
-    // Build explicit (post, destination) pairs
+    // Build exact per-draft (post, destination) pairs — NO implicit Cartesian product
     const pairs: PreviewPublishPair[] = [];
     if (targetType === 'GROUP') {
-      const chosenGroups = groups.filter((g) => selectedGroupIds.includes(g.id));
-      if (chosenGroups.length === 0) {
-        addToast('error', 'Chưa chọn nhóm Facebook đích', 'Hãy tích chọn ít nhất 1 nhóm ở cột bên phải.');
-        return;
-      }
+      const groupMap = new Map(groups.map((g) => [g.id, g]));
       for (const post of chosenDrafts) {
-        for (const grp of chosenGroups) {
+        const assignedIds = (groupIdsByDraftId[post.id] ?? []).filter((id) => groupMap.has(id));
+        if (assignedIds.length === 0) {
+          addToast(
+            'error',
+            `Bài nháp #${post.slotNumber} chưa được gán nhóm đích`,
+            `Hãy mở tab Bài ${post.slotNumber} và chọn ít nhất 1 nhóm Facebook ở cột bên phải.`
+          );
+          return;
+        }
+        for (const gid of assignedIds) {
+          const grp = groupMap.get(gid)!;
           pairs.push({
             pairKey: `${post.id}::${grp.id}`,
             post,
@@ -445,15 +518,23 @@ export const PostComposerPage: React.FC = () => {
         );
         return;
       }
-      const chosenPages = accountPages.filter(
-        (p) => selectedPageIds.includes(p.id) && p.canPublish
+      const publishablePageMap = new Map(
+        accountPages.filter((p) => p.canPublish).map((p) => [p.id, p])
       );
-      if (chosenPages.length === 0) {
-        addToast('error', 'Chưa chọn Fanpage có quyền đăng', 'Hãy chọn ít nhất 1 Fanpage hợp lệ.');
-        return;
-      }
       for (const post of chosenDrafts) {
-        for (const page of chosenPages) {
+        const assignedIds = (pageIdsByDraftId[post.id] ?? []).filter((id) =>
+          publishablePageMap.has(id)
+        );
+        if (assignedIds.length === 0) {
+          addToast(
+            'error',
+            `Bài nháp #${post.slotNumber} chưa được gán Fanpage đích`,
+            `Hãy mở tab Bài ${post.slotNumber} và chọn ít nhất 1 Fanpage có quyền đăng.`
+          );
+          return;
+        }
+        for (const pid of assignedIds) {
+          const page = publishablePageMap.get(pid)!;
           pairs.push({
             pairKey: `${post.id}::${page.id}`,
             post,
@@ -499,10 +580,22 @@ export const PostComposerPage: React.FC = () => {
     navigate('/dashboard');
   };
 
-  const validSelectedDraftCount = draftPosts.filter(
-    (d) => selectedDraftIds.includes(d.id) && hasPublishableContent(d)
-  ).length;
-  const activeDestCount = targetType === 'GROUP' ? selectedGroupIds.length : selectedPageIds.length;
+  // Accurate exact pair count across checked drafts (never Cartesian product)
+  const totalAssignedPairsCount = useMemo(() => {
+    const validGroupIds = new Set(groups.map((g) => g.id));
+    const validPageIds = new Set(accountPages.filter((p) => p.canPublish).map((p) => p.id));
+    let count = 0;
+    for (const draft of draftPosts) {
+      if (!selectedDraftIds.includes(draft.id)) continue;
+      if (targetType === 'GROUP') {
+        count += (groupIdsByDraftId[draft.id] ?? []).filter((id) => validGroupIds.has(id)).length;
+      } else {
+        count += (pageIdsByDraftId[draft.id] ?? []).filter((id) => validPageIds.has(id)).length;
+      }
+    }
+    return count;
+  }, [draftPosts, selectedDraftIds, targetType, groupIdsByDraftId, pageIdsByDraftId, groups, accountPages]);
+
   const allVisibleGroupsSelected =
     filteredGroups.length > 0 && filteredGroups.every((g) => selectedGroupIds.includes(g.id));
 
@@ -623,7 +716,7 @@ export const PostComposerPage: React.FC = () => {
           {publishMode === 'SCHEDULE' && (
             <div>
               <label htmlFor="schedule-input" className="block text-[11px] font-semibold text-slate-500 mb-1">
-                Ngày giờ (GMT+7)
+                Ngày giờ (GMT+7) · Lịch chờ: {usageSummary.scheduledTasksUsed}/{usageSummary.scheduledTasksLimit}
               </label>
               <input
                 id="schedule-input"
@@ -645,9 +738,9 @@ export const PostComposerPage: React.FC = () => {
               {publishMode === 'SCHEDULE' ? 'schedule_send' : 'send'}
             </span>
             {publishMode === 'SCHEDULE' ? 'Lên lịch tác vụ' : 'Tạo tác vụ đăng'}
-            {validSelectedDraftCount > 0 && activeDestCount > 0 && (
+            {totalAssignedPairsCount > 0 && (
               <span className="px-1.5 py-0.5 rounded bg-blue-500 text-[10px]">
-                {validSelectedDraftCount * activeDestCount} mục
+                {totalAssignedPairsCount} mục
               </span>
             )}
           </button>
@@ -754,6 +847,10 @@ export const PostComposerPage: React.FC = () => {
                 const isEditing = slot === activeSlotNumber;
                 const isChecked = selectedDraftIds.includes(draft.id);
                 const hasContent = hasPublishableContent(draft);
+                const assignedCount =
+                  targetType === 'GROUP'
+                    ? (groupIdsByDraftId[draft.id] ?? []).length
+                    : (pageIdsByDraftId[draft.id] ?? []).length;
 
                 return (
                   <div
@@ -778,12 +875,22 @@ export const PostComposerPage: React.FC = () => {
                       className="flex items-center justify-between gap-1 flex-1 min-w-0"
                     >
                       <span className="truncate">Bài {slot}</span>
-                      {hasContent && (
-                        <span
-                          className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"
-                          title="Đã có nội dung hợp lệ"
-                        />
-                      )}
+                      <span className="flex items-center gap-1 shrink-0">
+                        {assignedCount > 0 && (
+                          <span
+                            className="px-1 rounded bg-blue-100 text-blue-700 text-[10px] font-bold"
+                            title={`Đã gán ${assignedCount} đích đăng riêng cho Bài ${slot}`}
+                          >
+                            {assignedCount}
+                          </span>
+                        )}
+                        {hasContent && (
+                          <span
+                            className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"
+                            title="Đã có nội dung hợp lệ"
+                          />
+                        )}
+                      </span>
                     </button>
                   </div>
                 );
@@ -914,20 +1021,7 @@ export const PostComposerPage: React.FC = () => {
                         className="rounded-lg border border-slate-200 bg-white overflow-hidden flex flex-col"
                       >
                         <div className="aspect-video bg-slate-100 relative flex items-center justify-center overflow-hidden">
-                          {m.mediaType === 'IMAGE' && m.previewUrl ? (
-                            <img
-                              src={m.previewUrl}
-                              alt={m.originalName}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex flex-col items-center text-slate-500 text-[11px]">
-                              <span className="material-symbols-outlined text-[24px]">
-                                videocam
-                              </span>
-                              <span>Video</span>
-                            </div>
-                          )}
+                          <MediaPreview media={m} className="w-full h-full" />
                           <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-slate-900/70 text-white text-[10px] font-mono">
                             #{idx + 1}
                           </span>
@@ -1038,10 +1132,11 @@ export const PostComposerPage: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h2 className="text-sm font-bold text-slate-900">
-                      Danh sách Nhóm Facebook ({groups.length})
+                      Danh sách Nhóm Facebook ({groups.length}/{usageSummary.groupsLimit || '∞'})
                     </h2>
                     <p className="text-[11px] text-slate-500">
-                      Đã chọn <span className="font-bold text-blue-700">{selectedGroupIds.length}</span> nhóm đích
+                      Đang gán cho <span className="font-bold text-slate-800">Bài nháp #{activeSlotNumber}</span>:{' '}
+                      <span className="font-bold text-blue-700">{selectedGroupIds.length}</span> nhóm đích
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -1167,8 +1262,8 @@ export const PostComposerPage: React.FC = () => {
                     })}
                   </div>
 
-                  {/* Select All + Save Collection */}
-                  <div className="flex items-center justify-between pt-1">
+                  {/* Select All + Save Collection + Optional Copy Mapping */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                     <label className="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
                       <input
                         type="checkbox"
@@ -1181,17 +1276,28 @@ export const PostComposerPage: React.FC = () => {
                         Chọn tất cả đang hiển thị ({filteredGroups.length})
                       </span>
                     </label>
-                    <button
-                      type="button"
-                      disabled={selectedGroupIds.length === 0}
-                      onClick={() => {
-                        setEditingCollection(null);
-                        setCollectionModalOpen(true);
-                      }}
-                      className="text-xs font-semibold text-blue-600 hover:underline disabled:text-slate-400 disabled:no-underline"
-                    >
-                      + Lưu thành bộ sưu tập ({selectedGroupIds.length})
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {selectedDraftIds.length > 1 && selectedGroupIds.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleCopyActiveDestinationsToSelectedDrafts}
+                          className="text-[11px] font-semibold text-slate-600 hover:text-blue-700 hover:underline"
+                        >
+                          Áp dụng cho {selectedDraftIds.length} bài đã chọn
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={selectedGroupIds.length === 0}
+                        onClick={() => {
+                          setEditingCollection(null);
+                          setCollectionModalOpen(true);
+                        }}
+                        className="text-xs font-semibold text-blue-600 hover:underline disabled:text-slate-400 disabled:no-underline"
+                      >
+                        + Lưu thành bộ sưu tập ({selectedGroupIds.length})
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1309,14 +1415,25 @@ export const PostComposerPage: React.FC = () => {
           ) : (
             /* FANPAGE TAB */
             <div className="p-5 space-y-4">
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">
-                  Fanpage thuộc hồ sơ đang chọn
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Chỉ các Fanpage có quyền đăng bài (<code className="font-mono">canPublish = true</code>)
-                  và thuộc hồ sơ đã kết nối Meta OAuth mới có thể chọn.
-                </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Fanpage đích cho Bài nháp #{activeSlotNumber}
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Chỉ các Fanpage có quyền đăng bài (<code className="font-mono">canPublish = true</code>)
+                    và thuộc hồ sơ đã kết nối Meta OAuth mới có thể chọn.
+                  </p>
+                </div>
+                {selectedDraftIds.length > 1 && selectedPageIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleCopyActiveDestinationsToSelectedDrafts}
+                    className="text-xs font-semibold text-blue-600 hover:underline"
+                  >
+                    Áp dụng cho {selectedDraftIds.length} bài đã chọn
+                  </button>
+                )}
               </div>
 
               {!selectedAccount ||
@@ -1364,13 +1481,7 @@ export const PostComposerPage: React.FC = () => {
                           type="checkbox"
                           disabled={!page.canPublish}
                           checked={checked}
-                          onChange={() =>
-                            setSelectedPageIds((prev) =>
-                              prev.includes(page.id)
-                                ? prev.filter((id) => id !== page.id)
-                                : [...prev, page.id]
-                            )
-                          }
+                          onChange={() => handleTogglePage(page.id)}
                           className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                         />
                         <div className="min-w-0 flex-1">

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { IS_DEV_OR_DEMO } from '../config/demoConfig';
 import { useApp } from '../state/AppContext';
 import type { TaskItemStatus } from '../types/domain';
 import type { ExtensionPreviewScenario } from '../types/viewModels';
@@ -7,6 +8,7 @@ import {
   canCancelTask,
   canPauseTask,
   canResumeTask,
+  getEligibleExtensionSelection,
   getTaskProgress,
   TASK_ITEM_STATUS_META,
   TASK_STATUS_META,
@@ -29,6 +31,7 @@ export const ExtensionPopupPage: React.FC = () => {
     currentUser,
     currentPlan,
     tasks,
+    devices,
     usageSummary,
     confirmTaskItem,
     pauseTask,
@@ -45,25 +48,22 @@ export const ExtensionPopupPage: React.FC = () => {
   const [resultPostUrl, setResultPostUrl] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Pick a real active task/item from store when available
-  const activeTask = useMemo(() => {
-    return (
-      tasks.find((t) => t.status === 'WAITING_CONFIRMATION') ??
-      tasks.find((t) => t.status === 'PAUSED' || t.status === 'RUNNING' || t.status === 'SCHEDULED') ??
-      tasks[0] ??
-      null
-    );
-  }, [tasks]);
+  // Strict task/item eligibility: NEVER falls back to tasks[0] or items[0].
+  // Only picks MANUAL_GROUP tasks belonging to currentUser that are due, active,
+  // with active subscription and at least one non-revoked Extension device.
+  const eligibleSelection = useMemo(() => {
+    if (!currentUser) return null;
+    return getEligibleExtensionSelection({
+      userId: currentUser.id,
+      tasks,
+      devices,
+      isSubscriptionActive: usageSummary.isActive,
+    });
+  }, [currentUser, tasks, devices, usageSummary.isActive]);
 
-  const activeItem = useMemo(() => {
-    if (!activeTask) return null;
-    return (
-      activeTask.items.find((i) => i.status === 'WAITING_CONFIRMATION') ??
-      activeTask.items.find((i) => i.status === 'PENDING' || i.status === 'PROCESSING') ??
-      activeTask.items[0] ??
-      null
-    );
-  }, [activeTask]);
+  const activeTask = eligibleSelection?.task ?? null;
+  const activeItem = eligibleSelection?.item ?? null;
+  const hasNonRevokedDevice = devices.some((d) => d.connectionStatus !== 'REVOKED');
 
   const handleCopyContent = async () => {
     if (!activeItem) return;
@@ -161,7 +161,7 @@ export const ExtensionPopupPage: React.FC = () => {
             <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-[11px]">
               <div className="min-w-0">
                 <p className="font-bold text-slate-800 truncate">
-                  {currentUser?.fullName ?? 'Chưa đăng nhập'}
+                  {currentUser?.displayName ?? 'Chưa đăng nhập'}
                 </p>
                 <p className="text-slate-500 truncate">
                   {usageSummary.isActive && currentPlan ? currentPlan.name : 'Gói chưa kích hoạt'}
@@ -304,8 +304,24 @@ export const ExtensionPopupPage: React.FC = () => {
               {(scenario === 'WAITING_CONFIRMATION' || scenario === 'RUNNING') && (
                 <>
                   {!activeTask || !activeItem ? (
-                    <div className="my-auto text-center text-xs text-slate-500 py-8">
-                      Tài khoản hiện tại chưa có tác vụ nào trong hàng chờ.
+                    <div className="my-auto text-center space-y-2.5 py-8">
+                      <span className="material-symbols-outlined text-[36px] text-slate-300">
+                        inbox
+                      </span>
+                      <p className="text-sm font-bold text-slate-900">Không có tác vụ cần xử lý</p>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        {!usageSummary.isActive
+                          ? 'Gói dịch vụ hiện đã hết hạn hoặc chưa kích hoạt.'
+                          : !hasNonRevokedDevice
+                          ? 'Tài khoản chưa có thiết bị Extension hợp lệ (chưa kết nối hoặc đã bị thu hồi).'
+                          : 'Không có tác vụ đăng Nhóm (MANUAL_GROUP) nào đã đến hạn và đang chờ xác nhận.'}
+                      </p>
+                      <Link
+                        to={!usageSummary.isActive ? '/pricing' : '/post'}
+                        className="inline-flex items-center justify-center h-8 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+                      >
+                        {!usageSummary.isActive ? 'Gia hạn gói dịch vụ' : 'Tạo tác vụ đăng Nhóm'}
+                      </Link>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -388,7 +404,11 @@ export const ExtensionPopupPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => {
-                              pauseTask(activeTask.id);
+                              const res = pauseTask(activeTask.id);
+                              if (!res.ok) {
+                                addToast('error', 'Không thể tạm dừng', res.error);
+                                return;
+                              }
                               addToast('info', 'Đã tạm dừng tác vụ');
                             }}
                             className="flex-1 h-8 rounded-lg border border-orange-200 text-orange-700 text-[11px] font-semibold hover:bg-orange-50"
@@ -400,7 +420,11 @@ export const ExtensionPopupPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => {
-                              resumeTask(activeTask.id);
+                              const res = resumeTask(activeTask.id);
+                              if (!res.ok) {
+                                addToast('error', 'Không thể tiếp tục', res.error);
+                                return;
+                              }
                               addToast('success', 'Đã tiếp tục tác vụ');
                             }}
                             className="flex-1 h-8 rounded-lg border border-blue-200 text-blue-700 text-[11px] font-semibold hover:bg-blue-50"
@@ -412,7 +436,11 @@ export const ExtensionPopupPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => {
-                              cancelTask(activeTask.id);
+                              const res = cancelTask(activeTask.id);
+                              if (!res.ok) {
+                                addToast('error', 'Không thể hủy tác vụ', res.error);
+                                return;
+                              }
                               addToast('warning', 'Đã hủy tác vụ');
                             }}
                             className="flex-1 h-8 rounded-lg border border-rose-200 text-rose-700 text-[11px] font-semibold hover:bg-rose-50"
@@ -445,31 +473,34 @@ export const ExtensionPopupPage: React.FC = () => {
 
         {/* RIGHT: Scenario Switcher & Compliance Notes */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
-            <h2 className="text-sm font-bold text-slate-900">
-              Bộ chuyển đổi trạng thái UI (9 trạng thái chuẩn hóa)
-            </h2>
-            <p className="text-xs text-slate-500">
-              Chọn bất kỳ trạng thái nào bên dưới để kiểm tra hiển thị của Popup Extension 385×560px.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {SCENARIOS.map((sc) => (
-                <button
-                  key={sc.id}
-                  type="button"
-                  onClick={() => setScenario(sc.id)}
-                  className={`p-3 rounded-xl border text-left transition-colors ${
-                    scenario === sc.id
-                      ? 'border-blue-500 bg-blue-50/70 text-blue-900'
-                      : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  <p className="text-xs font-bold">{sc.label}</p>
-                  <p className="text-[11px] opacity-80 mt-0.5 line-clamp-2">{sc.desc}</p>
-                </button>
-              ))}
+          {IS_DEV_OR_DEMO && (
+            <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
+              <h2 className="text-sm font-bold text-slate-900">
+                Bộ chuyển đổi trạng thái UI (9 trạng thái chuẩn hóa)
+              </h2>
+              <p className="text-xs text-slate-500">
+                Chỉ dùng để kiểm tra hiển thị của Popup Extension 385×560px trong chế độ Dev/DEMO.
+                Không bỏ qua kiểm tra điều kiện hợp lệ ở tầng Service.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {SCENARIOS.map((sc) => (
+                  <button
+                    key={sc.id}
+                    type="button"
+                    onClick={() => setScenario(sc.id)}
+                    className={`p-3 rounded-xl border text-left transition-colors ${
+                      scenario === sc.id
+                        ? 'border-blue-500 bg-blue-50/70 text-blue-900'
+                        : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <p className="text-xs font-bold">{sc.label}</p>
+                    <p className="text-[11px] opacity-80 mt-0.5 line-clamp-2">{sc.desc}</p>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-2 text-xs text-slate-600">
             <h3 className="text-sm font-bold text-slate-900">Nguyên tắc hoạt động của Popup</h3>

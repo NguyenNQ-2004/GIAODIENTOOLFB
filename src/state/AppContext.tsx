@@ -1,5 +1,11 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import type { DemoDatabase } from '../data/mockData';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { mockAppService } from '../services/mockService';
 import type {
   AdminConfirmPaymentRequest,
@@ -12,6 +18,7 @@ import type {
   ForgotPasswordRequest,
   LoginRequest,
   RegisterRequest,
+  RescheduleTaskRequest,
   ResetPasswordRequest,
   SavePostTemplateRequest,
   ServiceResult,
@@ -19,6 +26,7 @@ import type {
   UpsertPlanRequest,
 } from '../types/api';
 import type {
+  AuditLog,
   ExtensionDevice,
   FacebookAccount,
   FacebookGroup,
@@ -46,8 +54,10 @@ import {
 } from '../utils/formatters';
 
 interface AppContextValue {
-  // Session
+  // Session & schema migration status
   currentUser: User | null;
+  schemaMigrationNotice: string | null;
+  dismissSchemaMigrationNotice: () => void;
   // User-scoped workspace data
   accounts: FacebookAccount[];
   pages: FacebookPage[];
@@ -71,6 +81,9 @@ interface AppContextValue {
   allTasks: PublishingTask[];
   allAccounts: FacebookAccount[];
   allGroups: FacebookGroup[];
+  allAuditLogs: AuditLog[];
+  // Media helper
+  isMediaReferenced: (mediaId: string) => boolean;
   // Toasts
   toasts: ToastMessage[];
   addToast: (type: ToastType, title: string, description?: string) => void;
@@ -105,6 +118,8 @@ interface AppContextValue {
   deleteCollection: (collectionId: string) => ServiceResult<void>;
   // Task actions
   createTask: (req: CreatePublishingTaskRequest) => ServiceResult<PublishingTask>;
+  rescheduleTask: (req: RescheduleTaskRequest) => ServiceResult<PublishingTask>;
+  triggerDueScheduledTaskDemo: (taskId: string) => ServiceResult<PublishingTask>;
   pauseTask: (taskId: string) => ServiceResult<PublishingTask>;
   resumeTask: (taskId: string) => ServiceResult<PublishingTask>;
   cancelTask: (taskId: string) => ServiceResult<PublishingTask>;
@@ -137,10 +152,15 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [revision, setRevision] = useState(0);
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  // Tear-free subscription to immutable structural-sharing snapshots
+  const storeSnapshot = useSyncExternalStore(
+    mockAppService.subscribe,
+    mockAppService.getStoreSnapshot,
+    mockAppService.getStoreSnapshot
+  );
+  const { db, currentUserId, schemaMigrationNotice } = storeSnapshot;
 
-  const bump = useCallback(() => setRevision((r) => r + 1), []);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -154,61 +174,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4500);
   }, []);
 
-  const db: DemoDatabase = useMemo(() => {
-    void revision;
-    return mockAppService.getDatabaseSnapshot();
-  }, [revision]);
-
-  const currentUser = useMemo(() => {
-    void revision;
-    return mockAppService.getCurrentUser();
-  }, [revision]);
+  const currentUser = useMemo(
+    () => (currentUserId ? db.users.find((u) => u.id === currentUserId) ?? null : null),
+    [db.users, currentUserId]
+  );
 
   const userId = currentUser?.id ?? null;
 
-  // Strictly user-scoped slices
+  // Strictly user-scoped slices — depend directly on immutable slice references
   const accounts = useMemo(
     () => (userId ? db.accounts.filter((a) => a.userId === userId) : []),
-    [db, userId]
+    [db.accounts, userId]
   );
   const pages = useMemo(
     () => (userId ? db.pages.filter((p) => p.userId === userId) : []),
-    [db, userId]
+    [db.pages, userId]
   );
   const groups = useMemo(
     () => (userId ? db.groups.filter((g) => g.userId === userId) : []),
-    [db, userId]
+    [db.groups, userId]
   );
   const collections = useMemo(
     () => (userId ? db.collections.filter((c) => c.userId === userId) : []),
-    [db, userId]
+    [db.collections, userId]
   );
   const collectionItems = useMemo(() => {
     if (!userId) return [];
     const colIds = new Set(collections.map((c) => c.id));
     return db.collectionItems.filter((ci) => colIds.has(ci.collectionId));
-  }, [db, userId, collections]);
+  }, [db.collectionItems, userId, collections]);
 
   const draftPosts = useMemo(() => {
     if (!userId) return [];
     return db.posts
       .filter((p) => p.userId === userId && p.status === 'DRAFT' && p.slotNumber !== null)
       .sort((a, b) => (a.slotNumber ?? 0) - (b.slotNumber ?? 0));
-  }, [db, userId]);
+  }, [db.posts, userId]);
 
   const savedPosts = useMemo(() => {
     if (!userId) return [];
     return db.posts
       .filter((p) => p.userId === userId && p.status === 'SAVED')
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }, [db, userId]);
+  }, [db.posts, userId]);
 
   const tasks = useMemo(() => {
     if (!userId) return [];
     return db.tasks
       .filter((t) => t.userId === userId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [db, userId]);
+  }, [db.tasks, userId]);
 
   const devices = useMemo<DeviceViewModel[]>(() => {
     if (!userId) return [];
@@ -218,27 +233,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...d,
         connectionStatus: computeDeviceConnectionStatus(d),
       }));
-  }, [db, userId]);
+  }, [db.devices, userId]);
 
   const orders = useMemo(() => {
     if (!userId) return [];
     return db.orders
       .filter((o) => o.userId === userId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [db, userId]);
+  }, [db.orders, userId]);
 
-  const plans = useMemo(() => [...db.plans], [db]);
-  const activePlans = useMemo(() => db.plans.filter((p) => p.isActive), [db]);
+  const plans = useMemo(() => [...db.plans], [db.plans]);
+  const activePlans = useMemo(() => db.plans.filter((p) => p.isActive), [db.plans]);
 
-  const subscription = useMemo(
-    () => (userId ? mockAppService.getUserSubscription(userId) : null),
-    [userId, revision]
-  );
+  const subscription = useMemo(() => {
+    if (!userId) return null;
+    const userSubs = db.subscriptions
+      .filter((s) => s.userId === userId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return userSubs[0] ?? null;
+  }, [db.subscriptions, userId]);
 
-  const currentPlan = useMemo(
-    () => (userId ? mockAppService.getUserPlan(userId) : null),
-    [userId, revision]
-  );
+  const currentPlan = useMemo(() => {
+    if (!subscription) return null;
+    return db.plans.find((p) => p.id === subscription.planId) ?? null;
+  }, [db.plans, subscription]);
 
   const usageSummary = useMemo(
     () =>
@@ -254,406 +272,351 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const isAdmin = currentUser?.role === 'ADMIN';
 
-  // Wrapped mutators that bump revision on change
-  const login = useCallback(
-    (req: LoginRequest): ServiceResult<User> => {
-      const res = mockAppService.login(req);
-      bump();
-      if (!res.ok || !res.data) return { ok: false, error: res.error };
-      return { ok: true, data: res.data.user };
-    },
-    [bump]
-  );
+  const dismissSchemaMigrationNotice = useCallback(() => {
+    mockAppService.dismissSchemaMigrationNotice();
+  }, []);
 
-  const loginAsDemoUser = useCallback(
-    (targetUserId: string): ServiceResult<User> => {
-      const res = mockAppService.loginAsDemoUser(targetUserId);
-      bump();
-      if (!res.ok || !res.data) return { ok: false, error: res.error };
-      return { ok: true, data: res.data.user };
-    },
-    [bump]
-  );
+  const isMediaReferenced = useCallback((mediaId: string) => {
+    return mockAppService.isMediaReferenced(mediaId);
+  }, []);
 
-  const register = useCallback(
-    (req: RegisterRequest): ServiceResult<User> => {
-      const res = mockAppService.register(req);
-      bump();
-      if (!res.ok || !res.data) return { ok: false, error: res.error };
-      return { ok: true, data: res.data.user };
-    },
-    [bump]
-  );
+  // Auth actions
+  const login = useCallback((req: LoginRequest): ServiceResult<User> => {
+    const res = mockAppService.login(req);
+    if (!res.ok || !res.data) return { ok: false, error: res.error, code: res.code };
+    return { ok: true, data: res.data.user };
+  }, []);
+
+  const loginAsDemoUser = useCallback((targetUserId: string): ServiceResult<User> => {
+    const res = mockAppService.loginAsDemoUser(targetUserId);
+    if (!res.ok || !res.data) return { ok: false, error: res.error, code: res.code };
+    return { ok: true, data: res.data.user };
+  }, []);
+
+  const register = useCallback((req: RegisterRequest): ServiceResult<User> => {
+    const res = mockAppService.register(req);
+    if (!res.ok || !res.data) return { ok: false, error: res.error, code: res.code };
+    return { ok: true, data: res.data.user };
+  }, []);
 
   const forgotPassword = useCallback((req: ForgotPasswordRequest) => {
     return mockAppService.forgotPassword(req);
   }, []);
 
-  const resetPassword = useCallback(
-    (req: ResetPasswordRequest) => {
-      const res = mockAppService.resetPassword(req);
-      bump();
-      return res;
-    },
-    [bump]
-  );
+  const resetPassword = useCallback((req: ResetPasswordRequest) => {
+    return mockAppService.resetPassword(req);
+  }, []);
 
   const changePassword = useCallback(
     (req: ChangePasswordRequest) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.changePassword(userId, req);
-      bump();
-      return res;
+      return mockAppService.changePassword(userId, req);
     },
-    [userId, bump]
+    [userId]
   );
 
   const logout = useCallback(() => {
     mockAppService.logout();
-    bump();
-  }, [bump]);
+  }, []);
 
   const resetDemoData = useCallback(() => {
     mockAppService.resetDemoDatabase();
-    bump();
     addToast('info', 'Đã đặt lại dữ liệu DEMO', 'Toàn bộ dữ liệu mẫu đã được khôi phục về mặc định.');
-  }, [bump, addToast]);
+  }, [addToast]);
 
+  // Post actions
   const updateDraftSlot = useCallback(
     (
       slotNumber: number,
       patch: { content?: string; linkUrl?: string | null; media?: MediaAttachment[] }
     ) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.updateDraftSlot(userId, slotNumber, patch);
-      bump();
-      return res;
+      return mockAppService.updateDraftSlot(userId, slotNumber, patch);
     },
-    [userId, bump]
+    [userId]
   );
 
   const resetDraftSlot = useCallback(
     (slotNumber: number) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.resetDraftSlot(userId, slotNumber);
-      bump();
-      return res;
+      return mockAppService.resetDraftSlot(userId, slotNumber);
     },
-    [userId, bump]
+    [userId]
   );
 
   const savePostTemplate = useCallback(
     (req: SavePostTemplateRequest) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.savePostTemplate(userId, req);
-      bump();
-      return res;
+      return mockAppService.savePostTemplate(userId, req);
     },
-    [userId, bump]
+    [userId]
   );
 
   const deleteSavedPost = useCallback(
     (postId: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.deleteSavedPost(userId, postId);
-      bump();
-      return res;
+      return mockAppService.deleteSavedPost(userId, postId);
     },
-    [userId, bump]
+    [userId]
   );
 
+  // Group & Collection actions
   const createGroup = useCallback(
     (req: UpsertGroupRequest) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.createGroup(userId, req);
-      bump();
-      return res;
+      return mockAppService.createGroup(userId, req);
     },
-    [userId, bump]
+    [userId]
   );
 
   const updateGroup = useCallback(
     (groupId: string, req: UpsertGroupRequest) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.updateGroup(userId, groupId, req);
-      bump();
-      return res;
+      return mockAppService.updateGroup(userId, groupId, req);
     },
-    [userId, bump]
+    [userId]
   );
 
   const deleteGroup = useCallback(
     (groupId: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.deleteGroup(userId, groupId);
-      bump();
-      return res;
+      return mockAppService.deleteGroup(userId, groupId);
     },
-    [userId, bump]
+    [userId]
   );
 
   const importGroups = useCallback(
     (rows: UpsertGroupRequest[]) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.importGroups(userId, rows);
-      bump();
-      return res;
+      return mockAppService.importGroups(userId, rows);
     },
-    [userId, bump]
+    [userId]
   );
 
   const createCollection = useCallback(
     (name: string, groupIds: string[]) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.createCollection(userId, name, groupIds);
-      bump();
-      return res;
+      return mockAppService.createCollection(userId, name, groupIds);
     },
-    [userId, bump]
+    [userId]
   );
 
   const renameCollection = useCallback(
     (collectionId: string, name: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.renameCollection(userId, collectionId, name);
-      bump();
-      return res;
+      return mockAppService.renameCollection(userId, collectionId, name);
     },
-    [userId, bump]
+    [userId]
   );
 
   const setCollectionGroups = useCallback(
     (collectionId: string, groupIds: string[]) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.setCollectionGroups(userId, collectionId, groupIds);
-      bump();
-      return res;
+      return mockAppService.setCollectionGroups(userId, collectionId, groupIds);
     },
-    [userId, bump]
+    [userId]
   );
 
   const deleteCollection = useCallback(
     (collectionId: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.deleteCollection(userId, collectionId);
-      bump();
-      return res;
+      return mockAppService.deleteCollection(userId, collectionId);
     },
-    [userId, bump]
+    [userId]
   );
 
+  // Task actions
   const createTask = useCallback(
     (req: CreatePublishingTaskRequest) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.createTask(userId, req);
-      bump();
-      return res;
+      return mockAppService.createTask(userId, req);
     },
-    [userId, bump]
+    [userId]
+  );
+
+  const rescheduleTask = useCallback(
+    (req: RescheduleTaskRequest) => {
+      if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
+      return mockAppService.rescheduleTask(userId, req);
+    },
+    [userId]
+  );
+
+  const triggerDueScheduledTaskDemo = useCallback(
+    (taskId: string) => {
+      if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
+      return mockAppService.triggerDueScheduledTaskDemo(userId, taskId);
+    },
+    [userId]
   );
 
   const pauseTask = useCallback(
     (taskId: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.pauseTask(userId, taskId);
-      bump();
-      return res;
+      return mockAppService.pauseTask(userId, taskId);
     },
-    [userId, bump]
+    [userId]
   );
 
   const resumeTask = useCallback(
     (taskId: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.resumeTask(userId, taskId);
-      bump();
-      return res;
+      return mockAppService.resumeTask(userId, taskId);
     },
-    [userId, bump]
+    [userId]
   );
 
   const cancelTask = useCallback(
     (taskId: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.cancelTask(userId, taskId);
-      bump();
-      return res;
+      return mockAppService.cancelTask(userId, taskId);
     },
-    [userId, bump]
+    [userId]
   );
 
   const confirmTaskItem = useCallback(
     (req: ConfirmTaskItemRequest) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.confirmTaskItem(userId, req);
-      bump();
-      return res;
+      return mockAppService.confirmTaskItem(userId, req);
     },
-    [userId, bump]
+    [userId]
   );
 
   const retryTaskItem = useCallback(
     (taskId: string, itemId: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.retryTaskItem(userId, taskId, itemId);
-      bump();
-      return res;
+      return mockAppService.retryTaskItem(userId, taskId, itemId);
     },
-    [userId, bump]
+    [userId]
   );
 
   const retryFailedItems = useCallback(
     (taskId: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.retryFailedItems(userId, taskId);
-      bump();
-      return res;
+      return mockAppService.retryFailedItems(userId, taskId);
     },
-    [userId, bump]
+    [userId]
   );
 
+  // Account & Device actions
   const createManualProfile = useCallback(
     (req: CreateManualProfileRequest) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.createManualProfile(userId, req);
-      bump();
-      return res;
+      return mockAppService.createManualProfile(userId, req);
     },
-    [userId, bump]
+    [userId]
   );
 
   const simulateDemoOAuthConnect = useCallback(
     (displayName: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.simulateDemoOAuthConnect(userId, displayName);
-      bump();
-      return res;
+      return mockAppService.simulateDemoOAuthConnect(userId, displayName);
     },
-    [userId, bump]
+    [userId]
   );
 
   const refreshAccountStatus = useCallback(
     (accountId: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.refreshAccountStatus(userId, accountId);
-      bump();
-      return res;
+      return mockAppService.refreshAccountStatus(userId, accountId);
     },
-    [userId, bump]
+    [userId]
   );
 
   const disconnectAccount = useCallback(
     (accountId: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.disconnectAccount(userId, accountId);
-      bump();
-      return res;
+      return mockAppService.disconnectAccount(userId, accountId);
     },
-    [userId, bump]
+    [userId]
   );
 
   const syncPages = useCallback(
     (accountId: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.syncPages(userId, accountId);
-      bump();
-      return res;
+      return mockAppService.syncPages(userId, accountId);
     },
-    [userId, bump]
+    [userId]
   );
 
   const connectExtensionDevice = useCallback(
     (deviceName: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.connectExtensionDevice(userId, deviceName);
-      bump();
-      return res;
+      return mockAppService.connectExtensionDevice(userId, deviceName);
     },
-    [userId, bump]
+    [userId]
   );
 
   const checkDeviceConnection = useCallback(
     (deviceId: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.checkDeviceConnection(userId, deviceId);
-      bump();
-      return res;
+      return mockAppService.checkDeviceConnection(userId, deviceId);
     },
-    [userId, bump]
+    [userId]
   );
 
   const revokeDevice = useCallback(
     (deviceId: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.revokeDevice(userId, deviceId);
-      bump();
-      return res;
+      return mockAppService.revokeDevice(userId, deviceId);
     },
-    [userId, bump]
+    [userId]
   );
 
+  // Billing actions
   const createPaymentOrder = useCallback(
     (req: CreatePaymentOrderRequest) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.createPaymentOrder(userId, req);
-      bump();
-      return res;
+      return mockAppService.createPaymentOrder(userId, req);
     },
-    [userId, bump]
+    [userId]
   );
 
   const checkOrderStatus = useCallback(
     (orderId: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.checkOrderStatus(userId, orderId);
-      bump();
-      return res;
+      return mockAppService.checkOrderStatus(userId, orderId);
     },
-    [userId, bump]
+    [userId]
   );
 
   const cancelPaymentOrder = useCallback(
     (orderId: string) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.cancelPaymentOrder(userId, orderId);
-      bump();
-      return res;
+      return mockAppService.cancelPaymentOrder(userId, orderId);
     },
-    [userId, bump]
+    [userId]
   );
 
+  // Admin actions
   const adminUpdateUser = useCallback(
     (req: AdminUpdateUserRequest) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.updateUser(userId, req);
-      bump();
-      return res;
+      return mockAppService.updateUser(userId, req);
     },
-    [userId, bump]
+    [userId]
   );
 
   const adminUpsertPlan = useCallback(
     (req: UpsertPlanRequest) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.upsertPlan(userId, req);
-      bump();
-      return res;
+      return mockAppService.upsertPlan(userId, req);
     },
-    [userId, bump]
+    [userId]
   );
 
   const adminConfirmPaymentDemo = useCallback(
     (req: AdminConfirmPaymentRequest) => {
       if (!userId) return { ok: false, error: 'Chưa đăng nhập.' };
-      const res = mockAppService.confirmPaymentOrderDemo(userId, req);
-      bump();
-      return res;
+      return mockAppService.confirmPaymentOrderDemo(userId, req);
     },
-    [userId, bump]
+    [userId]
   );
 
   const value: AppContextValue = {
     currentUser,
+    schemaMigrationNotice,
+    dismissSchemaMigrationNotice,
     accounts,
     pages,
     groups,
@@ -675,6 +638,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     allTasks: isAdmin ? db.tasks : [],
     allAccounts: isAdmin ? db.accounts : [],
     allGroups: isAdmin ? db.groups : [],
+    allAuditLogs: isAdmin ? db.auditLogs : [],
+    isMediaReferenced,
     toasts,
     addToast,
     dismissToast,
@@ -699,6 +664,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCollectionGroups,
     deleteCollection,
     createTask,
+    rescheduleTask,
+    triggerDueScheduledTaskDemo,
     pauseTask,
     resumeTask,
     cancelTask,
