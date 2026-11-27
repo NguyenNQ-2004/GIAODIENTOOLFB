@@ -1,1082 +1,458 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BillingCycle, PaymentOrder, PlanTier } from '../types/app';
-import { PLAN_SPECS } from '../data/mockData';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useApp } from '../state/AppContext';
+import type { BillingPeriod, PaymentOrder, PaymentOrderStatus } from '../types/domain';
+import { computeCountdown, formatVietnamDate, formatVietnamDateTime } from '../utils/dateTime';
+import { formatVnd } from '../utils/formatters';
 
-interface PricingPageProps {
-  currentPlan: PlanTier;
-  billingCycle: BillingCycle;
-  onChangeBillingCycle: (cycle: BillingCycle) => void;
-  accountsCount: number;
-  groupsCount: number;
-  scheduledCount: number;
-  orders: PaymentOrder[];
-  onVerifyOrderPayment: (orderId: string, plan: PlanTier, cycle: BillingCycle) => void;
-  onCreateOrder: (plan: PlanTier, cycle: BillingCycle) => PaymentOrder;
-  onNotify: (type: 'success' | 'info' | 'warning' | 'error', msg: string) => void;
-}
+const ORDER_STATUS_META: Record<PaymentOrderStatus, { label: string; badgeClass: string }> = {
+  PENDING: { label: 'Chờ thanh toán', badgeClass: 'bg-amber-50 text-amber-800 border-amber-200' },
+  PAID: { label: 'Đã thanh toán', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  FAILED: { label: 'Thất bại', badgeClass: 'bg-rose-50 text-rose-700 border-rose-200' },
+  EXPIRED: { label: 'Hết hạn', badgeClass: 'bg-slate-100 text-slate-600 border-slate-200' },
+  CANCELLED: { label: 'Đã hủy', badgeClass: 'bg-slate-100 text-slate-500 border-slate-200' },
+};
 
-const formatVnd = (val: number) =>
-  val.toLocaleString('vi-VN') + 'đ';
+export const PricingPage: React.FC = () => {
+  const {
+    activePlans,
+    plans,
+    orders,
+    usageSummary,
+    createPaymentOrder,
+    checkOrderStatus,
+    cancelPaymentOrder,
+    addToast,
+  } = useApp();
 
-export const PricingPage: React.FC<PricingPageProps> = ({
-  currentPlan,
-  billingCycle,
-  onChangeBillingCycle,
-  accountsCount,
-  groupsCount,
-  scheduledCount,
-  orders,
-  onVerifyOrderPayment,
-  onCreateOrder,
-  onNotify,
-}) => {
-  const [selectedOrderId, setSelectedOrderId] = useState<string>(
-    orders.find((o) => o.status === 'PENDING')?.id || orders[0]?.id || 'ORD-20241024-8902'
-  );
-  const [secondsLeft, setSecondsLeft] = useState<number>(14 * 60 + 58);
-  const [checkingPayment, setCheckingPayment] = useState<boolean>(false);
-  const [orderSearch, setOrderSearch] = useState<string>('');
-  const [orderStatusFilter, setOrderStatusFilter] = useState<'ALL' | 'PENDING' | 'PAID' | 'EXPIRED'>('ALL');
-  const [invoiceModalOrder, setInvoiceModalOrder] = useState<PaymentOrder | null>(null);
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('MONTHLY');
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [cancelTargetOrder, setCancelTargetOrder] = useState<PaymentOrder | null>(null);
+  const [tickNow, setTickNow] = useState<Date>(() => new Date());
 
-  const checkoutRef = useRef<HTMLDivElement>(null);
-  const plansRef = useRef<HTMLDivElement>(null);
-
+  // Tick every second for accurate expiresAt countdown
   useEffect(() => {
-    const timer = setInterval(() => {
-      setSecondsLeft((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(timer);
+    const timer = window.setInterval(() => setTickNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
-  const currentSpec = PLAN_SPECS[currentPlan];
-  const savedGroupsUsed = Math.max(248, groupsCount);
-  const scheduledUsed = Math.max(5, scheduledCount);
+  const planMap = useMemo(() => new Map(plans.map((p) => [p.id, p])), [plans]);
 
-  const accountPct = Math.min(100, Math.round((accountsCount / currentSpec.maxAccounts) * 100));
-  const groupsPct = Math.min(100, Number(((savedGroupsUsed / currentSpec.maxGroups) * 100).toFixed(1)));
-  const tasksPct = Math.min(100, Number(((scheduledUsed / currentSpec.maxScheduledTasks) * 100).toFixed(1)));
+  // Select active pending order safely (never crashes when orders is empty)
+  const activeOrder = useMemo(() => {
+    if (selectedOrderId) {
+      const found = orders.find((o) => o.id === selectedOrderId);
+      if (found) return found;
+    }
+    return orders.find((o) => o.status === 'PENDING') ?? orders[0] ?? null;
+  }, [orders, selectedOrderId]);
 
-  const activeOrder =
-    orders.find((o) => o.id === selectedOrderId) ||
-    orders.find((o) => o.status === 'PENDING') ||
-    orders[0];
+  const countdown = useMemo(
+    () => (activeOrder ? computeCountdown(activeOrder.expiresAt, tickNow) : null),
+    [activeOrder, tickNow]
+  );
 
-  const activeOrderSpec = PLAN_SPECS[activeOrder.plan];
-  const transferMemo = `FBPAY ${activeOrder.id.split('-').pop() || 'ORD8902'}`;
-
-  const mins = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
-  const secs = String(secondsLeft % 60).padStart(2, '0');
-
-  const filteredOrders = useMemo(() => {
-    return orders.filter((o) => {
-      if (orderStatusFilter !== 'ALL' && o.status !== orderStatusFilter) return false;
-      if (orderSearch.trim()) {
-        const q = orderSearch.toLowerCase();
-        return (
-          o.id.toLowerCase().includes(q) ||
-          o.plan.toLowerCase().includes(q)
-        );
-      }
-      return true;
+  const handleCreateOrder = (planId: string) => {
+    const res = createPaymentOrder({
+      planId,
+      billingPeriod,
+      paymentMethod: 'VIETQR',
     });
-  }, [orders, orderStatusFilter, orderSearch]);
-
-  const handleSelectPlan = (tier: PlanTier) => {
-    const created = onCreateOrder(tier, billingCycle);
-    setSelectedOrderId(created.id);
-    setSecondsLeft(15 * 60);
-    checkoutRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!res.ok || !res.data) {
+      addToast('error', 'Không thể tạo đơn thanh toán', res.error);
+      return;
+    }
+    setSelectedOrderId(res.data.id);
+    addToast(
+      'success',
+      'Đã tạo đơn thanh toán (PENDING)',
+      `Mã đơn ${res.data.orderCode}. Đơn ở trạng thái chờ xác nhận thanh toán.`
+    );
   };
 
-  const copyText = (value: string, label: string) => {
-    navigator.clipboard?.writeText(value);
-    onNotify('success', label);
+  const handleCheckStatus = (order: PaymentOrder) => {
+    const res = checkOrderStatus(order.id);
+    if (!res.ok || !res.data) {
+      addToast('error', 'Không thể kiểm tra trạng thái đơn', res.error);
+      return;
+    }
+    if (res.data.status === 'PENDING') {
+      addToast(
+        'info',
+        'Đơn hàng vẫn đang Chờ thanh toán (PENDING)',
+        'Chế độ DEMO không tự đánh dấu PAID từ phía khách hàng. Hãy đăng nhập Admin → tab Thanh toán để xác nhận mô phỏng.'
+      );
+    } else if (res.data.status === 'EXPIRED') {
+      addToast('warning', 'Đơn hàng đã hết hạn', 'Vui lòng tạo đơn thanh toán mới nếu cần.');
+    } else {
+      addToast('success', `Trạng thái hiện tại: ${ORDER_STATUS_META[res.data.status].label}`);
+    }
   };
 
-  const handleVerifyClick = () => {
-    setCheckingPayment(true);
-    setTimeout(() => {
-      setCheckingPayment(false);
-      onVerifyOrderPayment(activeOrder.id, activeOrder.plan, activeOrder.cycle);
-    }, 1000);
-  };
+  const pct = (used: number, limit: number) =>
+    limit <= 0 ? 0 : Math.min(100, Math.round((used / limit) * 100));
 
   return (
-    <div className="flex flex-col gap-space-xl w-full max-w-[1720px] mx-auto pb-10">
-      {/* Top Meta Breadcrumb / SSL Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-space-md">
-        <div className="flex items-center gap-space-sm">
-          <span className="text-[13px] font-medium text-on-surface-variant">Cài đặt tài khoản</span>
-          <span className="material-symbols-outlined text-[14px] text-outline">chevron_right</span>
-          <span className="text-[13px] text-primary font-semibold">Gói dịch vụ &amp; Thanh toán</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-space-md">
-          <span className="text-[11px] text-on-surface-variant flex items-center gap-space-xs bg-surface-container-low px-space-md py-space-xs rounded-lg">
-            <span className="material-symbols-outlined text-[16px] text-primary">verified_user</span>
-            <span>Giao dịch mã hóa SSL 256-bit chuẩn PCI-DSS</span>
-          </span>
-          <div className="flex items-center gap-space-xs text-[11px] text-secondary">
-            <span>Hệ thống tự động kích hoạt sau</span>
-            <span className="font-semibold text-primary">30 giây</span>
-          </div>
-        </div>
-      </div>
-
-      {/* SECTION 1: Active Subscription & Resource Consumption */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-space-lg">
-        {/* Current Plan Card (5 cols) */}
-        <div className="xl:col-span-5 bg-surface-container-lowest p-5 rounded-xl shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute -right-8 -top-8 w-40 h-40 bg-gradient-to-br from-primary-fixed/40 to-transparent rounded-full blur-2xl pointer-events-none" />
-          <div className="flex flex-col gap-space-md relative z-10">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-space-sm">
-                <span className="text-xs uppercase tracking-wider text-primary font-semibold">
-                  Gói đang sử dụng
-                </span>
-                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-space-sm py-[2px] rounded text-xs font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  ACTIVE (Đang hoạt động)
-                </span>
-              </div>
-              <span className="text-[11px] text-on-surface-variant bg-surface-container-low px-space-sm py-[2px] rounded font-medium">
-                Chu kỳ: {billingCycle === 'yearly' ? 'YEARLY (Năm)' : 'MONTHLY (Tháng)'}
-              </span>
-            </div>
-
-            <div className="flex items-baseline justify-between mt-space-xs gap-3">
-              <div>
-                <h2 className="text-[28px] text-on-surface font-bold tracking-tight">
-                  {currentSpec.name}
-                </h2>
-                <p className="text-[13px] text-on-surface-variant mt-0.5">
-                  {currentSpec.description}
-                </p>
-              </div>
-              <div className="text-right shrink-0">
-                <span className="text-[20px] font-bold text-primary tabular-nums">
-                  Còn {currentPlan === 'BUSINESS' ? '365' : '83'} ngày
-                </span>
-                <p className="text-[11px] text-on-surface-variant">Thời hạn kết thúc chu kỳ</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-space-md p-space-md bg-surface-container-low rounded-lg mt-space-xs">
-              <div className="flex flex-col">
-                <span className="text-[11px] text-on-surface-variant">Ngày bắt đầu</span>
-                <span className="text-[13px] text-on-surface font-semibold tabular-nums">
-                  15/01/2024
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[11px] text-on-surface-variant">Ngày hết hạn</span>
-                <span className="text-[13px] font-semibold text-primary tabular-nums">
-                  {currentPlan === 'BUSINESS' ? '24/10/2025' : '15/01/2025'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-space-md mt-space-lg pt-space-md relative z-10">
-            <button
-              type="button"
-              onClick={() => checkoutRef.current?.scrollIntoView({ behavior: 'smooth' })}
-              className="h-9 px-space-xl bg-primary-container text-on-primary text-[13px] rounded-lg hover:bg-primary transition-colors flex items-center justify-center gap-space-xs font-semibold flex-1 whitespace-nowrap"
-            >
-              <span className="material-symbols-outlined text-[16px]">upgrade</span>
-              <span>Nâng cấp gói</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => plansRef.current?.scrollIntoView({ behavior: 'smooth' })}
-              className="h-9 px-space-xl bg-surface-container text-on-surface text-[13px] rounded-lg hover:bg-surface-container-high transition-colors flex items-center justify-center gap-space-xs font-medium whitespace-nowrap"
-            >
-              <span className="material-symbols-outlined text-[16px]">autorenew</span>
-              <span>Gia hạn gói</span>
-            </button>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Gói dịch vụ &amp; Thanh toán</h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Theo dõi mức sử dụng thực tế, nâng cấp gói và quản lý đơn thanh toán.
+          </p>
         </div>
 
-        {/* Resource Limits & Consumption (7 cols) */}
-        <div className="xl:col-span-7 bg-surface-container-lowest p-5 rounded-xl shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-space-md">
-              <div>
-                <h3 className="text-[18px] text-on-surface font-semibold">
-                  Hạn mức tài nguyên hệ thống
-                </h3>
-                <p className="text-[11px] text-on-surface-variant">
-                  Đồng bộ trực tiếp từ Database Contract người dùng
-                </p>
-              </div>
-              <span className="text-[11px] text-on-surface-variant bg-surface-container-low px-space-sm py-1 rounded">
-                Dữ liệu theo thời gian thực
-              </span>
-            </div>
-
-            <div className="flex flex-col gap-space-lg mt-space-md">
-              {/* Resource 1 */}
-              <div className="flex flex-col gap-space-xs">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[13px]">
-                  <span className="flex items-center gap-space-xs text-on-surface font-medium">
-                    <span className="material-symbols-outlined text-[18px] text-primary">
-                      account_circle
-                    </span>
-                    Tài khoản Facebook (plans.max_facebook_accounts)
-                  </span>
-                  <div className="flex items-center gap-space-sm">
-                    <span
-                      className={`font-semibold tabular-nums ${
-                        accountPct >= 100 ? 'text-error' : 'text-on-surface'
-                      }`}
-                    >
-                      {accountsCount} / {currentSpec.maxAccounts} tài khoản
-                    </span>
-                    <span
-                      className={`text-[11px] px-1.5 py-[2px] rounded font-medium tabular-nums ${
-                        accountPct >= 100
-                          ? 'bg-red-50 text-red-700'
-                          : 'bg-emerald-50 text-emerald-700'
-                      }`}
-                    >
-                      {accountPct}% - {accountPct >= 100 ? 'Đạt giới hạn gói' : 'Còn dư hạn mức'}
-                    </span>
-                  </div>
-                </div>
-                <div className="w-full bg-surface-container h-2 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      accountPct >= 100 ? 'bg-error' : 'bg-primary-container'
-                    }`}
-                    style={{ width: `${accountPct}%` }}
-                  />
-                </div>
-                <p className="text-[11px] text-on-surface-variant">
-                  {accountPct >= 100
-                    ? 'Cần nâng cấp lên Business để liên kết thêm tối đa 5 tài khoản vận hành.'
-                    : `Bạn có thể liên kết thêm ${
-                        currentSpec.maxAccounts - accountsCount
-                      } tài khoản Facebook nữa.`}
-                </p>
-              </div>
-
-              {/* Resource 2 */}
-              <div className="flex flex-col gap-space-xs">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[13px]">
-                  <span className="flex items-center gap-space-xs text-on-surface font-medium">
-                    <span className="material-symbols-outlined text-[18px] text-primary">groups</span>
-                    Nhóm đã lưu (plans.max_saved_groups)
-                  </span>
-                  <div className="flex items-center gap-space-sm">
-                    <span className="font-semibold text-on-surface tabular-nums">
-                      {savedGroupsUsed} / {currentSpec.maxGroups.toLocaleString('vi-VN')} nhóm
-                    </span>
-                    <span className="text-[11px] bg-blue-50 text-blue-700 px-1.5 py-[2px] rounded font-medium tabular-nums">
-                      {groupsPct}% - Dung lượng ổn định
-                    </span>
-                  </div>
-                </div>
-                <div className="w-full bg-surface-container h-2 rounded-full overflow-hidden">
-                  <div
-                    className="bg-primary-container h-full rounded-full transition-all duration-500"
-                    style={{ width: `${groupsPct}%` }}
-                  />
-                </div>
-                <p className="text-[11px] text-on-surface-variant">
-                  Bạn còn {(currentSpec.maxGroups - savedGroupsUsed).toLocaleString('vi-VN')} vị trí
-                  nhóm lưu trữ sẵn sàng cho chiến dịch phủ rộng.
-                </p>
-              </div>
-
-              {/* Resource 3 */}
-              <div className="flex flex-col gap-space-xs">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[13px]">
-                  <span className="flex items-center gap-space-xs text-on-surface font-medium">
-                    <span className="material-symbols-outlined text-[18px] text-primary">
-                      schedule_send
-                    </span>
-                    Tác vụ chờ lịch (plans.max_scheduled_tasks)
-                  </span>
-                  <div className="flex items-center gap-space-sm">
-                    <span className="font-semibold text-on-surface tabular-nums">
-                      {scheduledUsed} / {currentSpec.maxScheduledTasks} tác vụ
-                    </span>
-                    <span className="text-[11px] bg-amber-50 text-amber-700 px-1.5 py-[2px] rounded font-medium tabular-nums">
-                      {tasksPct}% - Đang hoạt động
-                    </span>
-                  </div>
-                </div>
-                <div className="w-full bg-surface-container h-2 rounded-full overflow-hidden">
-                  <div
-                    className="bg-amber-500 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${tasksPct}%` }}
-                  />
-                </div>
-                <p className="text-[11px] text-on-surface-variant">
-                  {scheduledUsed} bài đăng đang trong hàng đợi chờ bot Extension kích hoạt tự động
-                  theo giờ vàng.
-                </p>
-              </div>
-            </div>
-          </div>
+        {/* Billing Period Toggle */}
+        <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-white">
+          <button
+            type="button"
+            onClick={() => setBillingPeriod('MONTHLY')}
+            className={`h-8 px-3.5 rounded-md text-xs font-semibold transition-colors ${
+              billingPeriod === 'MONTHLY'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Thanh toán hàng tháng
+          </button>
+          <button
+            type="button"
+            onClick={() => setBillingPeriod('YEARLY')}
+            className={`h-8 px-3.5 rounded-md text-xs font-semibold transition-colors ${
+              billingPeriod === 'YEARLY'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Thanh toán hàng năm (Tiết kiệm 2 tháng)
+          </button>
         </div>
       </div>
 
-      {/* SECTION 2: Pricing Matrix & Billing Toggle */}
-      <div ref={plansRef} className="flex flex-col gap-space-lg w-full mt-space-md">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-md">
+      {/* Current Subscription & Exact Usage Summary */}
+      <section className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-[20px] text-on-surface font-bold tracking-tight">
-              Bảng giá dịch vụ
-            </h2>
-            <p className="text-[13px] text-on-surface-variant">
-              Đầu tư chính xác theo quy mô vận hành tài nguyên nhóm Facebook của bạn
-            </p>
-          </div>
-
-          <div className="flex items-center p-1 bg-surface-container-low rounded-lg shadow-sm">
-            <button
-              type="button"
-              onClick={() => onChangeBillingCycle('monthly')}
-              className={`px-space-lg py-1 rounded-md text-[13px] transition-all whitespace-nowrap ${
-                billingCycle === 'monthly'
-                  ? 'font-semibold bg-surface-container-lowest text-primary shadow-sm'
-                  : 'font-medium text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              Theo tháng
-            </button>
-            <button
-              type="button"
-              onClick={() => onChangeBillingCycle('yearly')}
-              className={`px-space-lg py-1 rounded-md text-[13px] transition-all flex items-center gap-space-xs whitespace-nowrap ${
-                billingCycle === 'yearly'
-                  ? 'font-semibold bg-surface-container-lowest text-primary shadow-sm'
-                  : 'font-medium text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              <span>Theo năm</span>
-              <span className="text-[11px] bg-amber-100 text-amber-800 px-1.5 py-[1px] rounded font-bold">
-                Tiết kiệm 2 tháng - Ưu đãi 17%
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {/* 3 Plan Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-space-lg items-stretch">
-          {(['BASIC', 'PRO', 'BUSINESS'] as PlanTier[]).map((tier) => {
-            const spec = PLAN_SPECS[tier];
-            const isCurrent = currentPlan === tier;
-            const price = billingCycle === 'yearly' ? spec.yearlyPrice : spec.monthlyPrice;
-
-            return (
-              <div
-                key={tier}
-                className={`bg-surface-container-lowest rounded-xl p-5 flex flex-col justify-between transition-all relative overflow-hidden ${
-                  isCurrent
-                    ? 'shadow-md ring-2 ring-primary-container'
-                    : tier === 'BUSINESS'
-                    ? 'shadow-sm hover:shadow-md bg-gradient-to-b from-surface-container-lowest via-surface-container-lowest to-surface-container-low/40'
-                    : 'shadow-sm hover:shadow-md'
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-slate-900">
+                Gói hiện tại:{' '}
+                {usageSummary.plan ? usageSummary.plan.name : 'Chưa đăng ký gói'}
+              </h2>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  usageSummary.isActive
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-rose-50 text-rose-700'
                 }`}
               >
-                {isCurrent && (
-                  <div className="absolute top-0 right-0">
-                    <span className="bg-primary-container text-on-primary text-[11px] px-space-md py-1 rounded-bl-lg font-semibold uppercase tracking-wider flex items-center gap-1 shadow-sm">
-                      <span className="material-symbols-outlined text-[14px]">star</span>
-                      Gói bạn đang dùng
+                {usageSummary.isActive
+                  ? `Đang hoạt động · Còn ${usageSummary.daysRemaining} ngày`
+                  : 'Hết hạn / Chưa kích hoạt'}
+              </span>
+            </div>
+            {usageSummary.subscription && (
+              <p className="text-xs text-slate-500 mt-1">
+                Hiệu lực: {formatVietnamDate(usageSummary.subscription.startsAt)} —{' '}
+                {formatVietnamDate(usageSummary.subscription.endsAt)} (
+                {usageSummary.subscription.billingPeriod === 'YEARLY' ? 'Theo năm' : 'Theo tháng'})
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            {
+              label: 'Hồ sơ Facebook đang dùng',
+              used: usageSummary.accountsUsed,
+              limit: usageSummary.accountsLimit,
+            },
+            {
+              label: 'Nhóm Facebook đã lưu',
+              used: usageSummary.groupsUsed,
+              limit: usageSummary.groupsLimit,
+            },
+            {
+              label: 'Tác vụ đã tạo hôm nay',
+              used: usageSummary.scheduledTodayUsed,
+              limit: usageSummary.scheduledTodayLimit,
+            },
+          ].map((metric) => (
+            <div key={metric.label} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="flex items-center justify-between text-xs mb-2">
+                <span className="text-slate-600 font-medium">{metric.label}</span>
+                <span className="font-bold text-slate-900 tabular-nums">
+                  {metric.used} / {metric.limit}
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+                <div
+                  className="h-full bg-blue-600 transition-all"
+                  style={{ width: `${pct(metric.used, metric.limit)}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Active Plans Grid (Live synced with Admin Plans CRUD) */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {activePlans.map((plan) => {
+          const price =
+            billingPeriod === 'YEARLY' ? plan.priceYearlyVnd : plan.priceMonthlyVnd;
+          const isCurrent = usageSummary.isActive && usageSummary.plan?.id === plan.id;
+          return (
+            <div
+              key={plan.id}
+              className={`bg-white rounded-xl border p-5 flex flex-col justify-between gap-5 ${
+                isCurrent ? 'border-blue-500 ring-1 ring-blue-500/20' : 'border-slate-200'
+              }`}
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-base font-bold text-slate-900">{plan.name}</h3>
+                  <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-mono font-bold">
+                    {plan.code}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">{plan.description}</p>
+                <div className="pt-1">
+                  <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                    {formatVnd(price)}
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    /{billingPeriod === 'YEARLY' ? 'năm' : 'tháng'}
+                  </span>
+                </div>
+
+                <ul className="space-y-2 pt-2 border-t border-slate-100 text-xs text-slate-700">
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-600">
+                      check_circle
+                    </span>
+                    Tối đa <strong>{plan.maxFacebookAccounts}</strong> hồ sơ Facebook
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-600">
+                      check_circle
+                    </span>
+                    Lưu trữ tối đa <strong>{plan.maxGroups}</strong> nhóm Facebook
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-600">
+                      check_circle
+                    </span>
+                    Tối đa <strong>{plan.maxScheduledTasksPerDay}</strong> tác vụ/ngày
+                  </li>
+                  {plan.features.map((feat) => (
+                    <li key={feat} className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-[16px] text-blue-600 mt-0.5 shrink-0">
+                        done
+                      </span>
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleCreateOrder(plan.id)}
+                className={`w-full h-10 rounded-lg text-xs font-semibold transition-colors ${
+                  isCurrent
+                    ? 'border border-blue-600 text-blue-700 bg-blue-50 hover:bg-blue-100'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {isCurrent ? 'Gia hạn gói này' : 'Tạo đơn nâng cấp'}
+              </button>
+            </div>
+          );
+        })}
+      </section>
+
+      {/* Active Order Checkout Box + Order History */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
+        {/* Checkout Panel */}
+        <section className="xl:col-span-5 bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-bold text-slate-900">Chi tiết đơn thanh toán</h2>
+            <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
+              DEMO — Chưa kết nối VietQR thật
+            </span>
+          </div>
+
+          {!activeOrder ? (
+            <div className="p-6 text-center rounded-xl border border-dashed border-slate-200 text-xs text-slate-500">
+              Bạn chưa có đơn thanh toán nào. Hãy chọn một gói dịch vụ ở phía trên để tạo đơn mới.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Mã đơn hàng</span>
+                  <span className="font-mono font-bold text-slate-900">{activeOrder.orderCode}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Gói dịch vụ</span>
+                  <span className="font-semibold text-slate-900">
+                    {planMap.get(activeOrder.planId)?.name ?? activeOrder.planId} (
+                    {activeOrder.billingPeriod === 'YEARLY' ? 'Năm' : 'Tháng'})
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Số tiền</span>
+                  <span className="font-bold text-blue-700 text-sm">
+                    {formatVnd(activeOrder.amountVnd)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Trạng thái</span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${
+                      ORDER_STATUS_META[activeOrder.status].badgeClass
+                    }`}
+                  >
+                    {ORDER_STATUS_META[activeOrder.status].label}
+                  </span>
+                </div>
+                {activeOrder.status === 'PENDING' && countdown && (
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200">
+                    <span className="text-slate-500">Thời gian giữ đơn</span>
+                    <span
+                      className={`font-mono font-bold ${
+                        countdown.isExpired ? 'text-rose-600' : 'text-amber-700'
+                      }`}
+                    >
+                      {countdown.isExpired ? 'Đã hết hạn' : countdown.formatted}
                     </span>
                   </div>
                 )}
+              </div>
 
-                <div className="flex flex-col gap-space-md">
-                  <div className="flex items-center justify-between gap-2">
-                    <span
-                      className={`text-[18px] font-bold ${
-                        isCurrent ? 'text-primary' : 'text-on-surface'
-                      }`}
-                    >
-                      {spec.name}
-                    </span>
-                    {!isCurrent && (
-                      <span
-                        className={`text-[11px] px-space-sm py-[2px] rounded font-semibold ${
-                          tier === 'BUSINESS'
-                            ? 'text-on-tertiary-container bg-tertiary-fixed'
-                            : 'text-secondary bg-surface-container'
-                        }`}
-                      >
-                        {spec.badge}
-                      </span>
-                    )}
-                    {isCurrent && (
-                      <span className="text-[11px] text-primary bg-primary-fixed px-space-sm py-[2px] rounded font-semibold">
-                        {spec.badge}
-                      </span>
-                    )}
-                  </div>
-
-                  <p className="text-[13px] text-on-surface-variant">{spec.description}</p>
-
-                  <div className="my-space-sm">
-                    <div className="flex items-baseline gap-space-xs">
-                      <span
-                        className={`text-[28px] font-bold tabular-nums ${
-                          isCurrent ? 'text-primary' : 'text-on-surface'
-                        }`}
-                      >
-                        {formatVnd(price)}
-                      </span>
-                      <span className="text-[13px] text-on-surface-variant">
-                        / {billingCycle === 'yearly' ? 'năm' : 'tháng'}
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-emerald-700 font-medium block mt-1">
-                      {tier === 'BASIC' && billingCycle === 'yearly'
-                        ? 'Khoảng 40.800đ/tháng khi trả cả năm'
-                        : tier === 'PRO' && billingCycle === 'yearly'
-                        ? 'Tiết kiệm 198.000đ khi thanh toán 12 tháng'
-                        : 'Đầy đủ tính năng cao cấp & ưu tiên bot xử lý'}
+              {/* Honest Placeholder QR (zero real bank numbers) */}
+              {activeOrder.status === 'PENDING' && (
+                <div className="p-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 text-center space-y-2">
+                  <div className="w-32 h-32 mx-auto rounded-xl bg-white border border-slate-200 flex flex-col items-center justify-center text-slate-400">
+                    <span className="material-symbols-outlined text-[40px]">qr_code_2</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wide mt-1">
+                      QR DEMO
                     </span>
                   </div>
-
-                  <div className="w-full h-[1px] bg-surface-container" />
-
-                  <div className="flex flex-col gap-space-sm py-space-xs">
-                    <span className="text-[11px] uppercase tracking-wider text-outline font-semibold">
-                      Hạn mức tài nguyên
-                    </span>
-                    <div className="flex items-center gap-space-sm text-[13px] text-on-surface">
-                      <span className="material-symbols-outlined text-[18px] text-primary">
-                        check_circle
-                      </span>
-                      <span>
-                        <strong>{spec.maxAccounts}</strong> tài khoản Facebook
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-space-sm text-[13px] text-on-surface">
-                      <span className="material-symbols-outlined text-[18px] text-primary">
-                        check_circle
-                      </span>
-                      <span>
-                        <strong>{spec.maxGroups.toLocaleString('vi-VN')}</strong> nhóm lưu trữ
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-space-sm text-[13px] text-on-surface">
-                      <span className="material-symbols-outlined text-[18px] text-primary">
-                        check_circle
-                      </span>
-                      <span>
-                        <strong>{spec.maxScheduledTasks}</strong> tác vụ chờ lịch
-                      </span>
-                    </div>
-                  </div>
+                  <p className="text-[11px] font-semibold text-slate-700">
+                    Mã QR minh họa — Không chuyển khoản thật
+                  </p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Nội dung chuyển khoản mẫu: <code className="font-mono font-bold">{activeOrder.orderCode}</code>.
+                    Xác nhận thanh toán thật sẽ do Webhook backend xử lý; trong chế độ DEMO, tài
+                    khoản Admin có thể xác nhận đơn tại mục Quản trị → Thanh toán.
+                  </p>
                 </div>
+              )}
 
-                <div className="mt-space-xl pt-space-md">
+              {activeOrder.status === 'PENDING' && (
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => handleSelectPlan(tier)}
-                    className={`w-full h-9 rounded-lg text-[13px] font-semibold transition-colors flex items-center justify-center gap-space-xs ${
-                      tier === 'BASIC' && !isCurrent
-                        ? 'bg-surface-container text-on-surface hover:bg-surface-container-high font-medium'
-                        : 'bg-primary-container text-on-primary hover:bg-primary shadow-sm'
-                    }`}
+                    onClick={() => handleCheckStatus(activeOrder)}
+                    className="flex-1 h-9 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
                   >
-                    <span className="material-symbols-outlined text-[16px]">
-                      {isCurrent ? 'autorenew' : tier === 'BUSINESS' ? 'bolt' : 'swap_horiz'}
-                    </span>
-                    <span>
-                      {isCurrent
-                        ? `Gia hạn ${spec.name}`
-                        : tier === 'BASIC'
-                        ? 'Chọn gói Basic'
-                        : `Nâng cấp lên ${tier === 'BUSINESS' ? 'Business' : 'Pro'}`}
-                    </span>
+                    Kiểm tra trạng thái
                   </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* SECTION 3: Dynamic VietQR Checkout Box */}
-      <div
-        ref={checkoutRef}
-        id="checkoutModal"
-        className="w-full bg-surface-container-lowest rounded-xl p-5 shadow-md mt-space-md relative overflow-hidden"
-      >
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-space-md pb-space-lg mb-space-lg border-b border-surface-container">
-          <div>
-            <div className="flex flex-wrap items-center gap-space-sm">
-              <span className="text-[20px] font-bold text-on-surface">
-                Thanh toán gói dịch vụ
-              </span>
-              <span
-                className={`text-[11px] px-space-sm py-[2px] rounded font-semibold flex items-center gap-1 ${
-                  activeOrder.status === 'PAID'
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-amber-50 text-amber-700'
-                }`}
-              >
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    activeOrder.status === 'PAID'
-                      ? 'bg-emerald-500'
-                      : 'bg-amber-500 animate-pulse'
-                  }`}
-                />
-                {activeOrder.status === 'PAID'
-                  ? 'Đơn hàng đã thanh toán thành công'
-                  : 'Đơn hàng đang chờ thanh toán'}
-              </span>
-            </div>
-            <p className="text-[13px] text-on-surface-variant mt-0.5">
-              Quét mã QR VietQR từ bất kỳ ứng dụng ngân hàng di động nào để kích hoạt tự động tức thì.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-space-md bg-surface-container-low px-space-lg py-space-sm rounded-lg">
-            <span className="material-symbols-outlined text-[20px] text-amber-600">timer</span>
-            <div className="flex flex-col">
-              <span className="text-[11px] text-on-surface-variant">
-                Thời gian thanh toán còn lại
-              </span>
-              <span className="text-[18px] font-bold text-error tracking-wider leading-none font-mono tabular-nums">
-                {mins}:{secs}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
-          {/* Left: VietQR SVG */}
-          <div className="lg:col-span-5 bg-surface-container-low/70 p-5 rounded-xl flex flex-col items-center justify-center text-center">
-            <div className="flex items-center justify-between w-full mb-space-md px-space-xs">
-              <div className="flex items-center gap-space-xs">
-                <span className="w-7 h-7 rounded bg-blue-700 text-white font-bold flex items-center justify-center text-[10px]">
-                  MB
-                </span>
-                <div className="flex flex-col text-left">
-                  <span className="text-xs font-bold text-on-surface leading-tight">MBBank</span>
-                  <span className="text-[11px] text-on-surface-variant leading-none">
-                    Ngân hàng TMCP Quân Đội
-                  </span>
-                </div>
-              </div>
-              <div className="inline-flex items-center gap-1 bg-surface-container-lowest px-1.5 py-1 rounded shadow-sm">
-                <span className="text-xs font-bold text-primary">Viet</span>
-                <span className="text-xs font-bold text-red-600">QR</span>
-              </div>
-            </div>
-
-            <div className="bg-white p-space-md rounded-xl shadow-sm relative flex items-center justify-center">
-              <svg
-                className="w-56 h-56 text-slate-900"
-                fill="none"
-                viewBox="0 0 200 200"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <rect fill="white" height="200" rx="8" width="200" />
-                <rect fill="currentColor" height="46" rx="4" width="46" x="14" y="14" />
-                <rect fill="white" height="30" rx="2" width="30" x="22" y="22" />
-                <rect fill="currentColor" height="18" rx="1" width="18" x="28" y="28" />
-                <rect fill="currentColor" height="46" rx="4" width="46" x="140" y="14" />
-                <rect fill="white" height="30" rx="2" width="30" x="148" y="22" />
-                <rect fill="currentColor" height="18" rx="1" width="18" x="154" y="28" />
-                <rect fill="currentColor" height="46" rx="4" width="46" x="14" y="140" />
-                <rect fill="white" height="30" rx="2" width="30" x="22" y="148" />
-                <rect fill="currentColor" height="18" rx="1" width="18" x="28" y="154" />
-                <path
-                  d="M70 18h10v10H70zm20 0h10v10H90zm20 0h10v10h-10zm-40 20h20v10H70zm30 0h10v10h-10zm20 0h10v10h-10zm-50 20h10v10H70zm20 0h20v10H90zm30 0h10v10h-10zm10 0h10v10h-10zm-70 20h10v10H70zm40 0h20v10h-20zm-40 20h10v10H70zm30 0h10v10h-10zm20 0h20v10h-20zm-50 20h10v10H70zm20 0h10v10H90zm30 0h10v10h-10zm-50 20h20v10H70zm30 0h10v10h-10zm20 0h20v10h-20z"
-                  fill="currentColor"
-                />
-                <path
-                  d="M18 70h10v10H18zm20 0h10v10H38zm20 0h10v10H58zm82 0h10v10h-10zm20 0h10v10h-10zm-122 20h10v10H18zm30 0h10v10H48zm82 0h20v10h-20zm-112 20h20v10H18zm30 0h10v10H48zm82 0h10v10h-10zm20 0h10v10h-10z"
-                  fill="currentColor"
-                />
-                <rect fill="#2563EB" height="40" rx="6" width="40" x="80" y="80" />
-                <path d="M89 95h22v3H89zm0 7h15v3H89zm0-14h22v3H89z" fill="white" />
-              </svg>
-              <div className="absolute bottom-2 right-2 bg-surface-container-lowest/90 px-1.5 py-0.5 rounded text-[10px] text-on-surface-variant">
-                VietQR 2.0
-              </div>
-            </div>
-
-            <p className="text-[11px] text-on-surface-variant mt-space-md max-w-xs">
-              Mở App ngân hàng bất kỳ (Vietcombank, MB, Techcombank, VPBank...) chọn chức năng{' '}
-              <strong>Quét mã QR</strong>
-            </p>
-          </div>
-
-          {/* Right: Order Info & Copy Buttons */}
-          <div className="lg:col-span-7 flex flex-col justify-between h-full gap-space-lg">
-            <div className="flex flex-col gap-space-md">
-              <div className="p-space-lg bg-surface-container-low rounded-lg flex flex-wrap items-center justify-between gap-space-md">
-                <div className="flex flex-col">
-                  <span className="text-[11px] text-on-surface-variant">Gói dịch vụ đã chọn</span>
-                  <span className="text-[18px] font-bold text-on-surface">
-                    {activeOrderSpec.name} ({activeOrder.cycle === 'yearly' ? '1 Năm' : '1 Tháng'})
-                  </span>
-                  <span className="text-[11px] text-primary">
-                    Tài nguyên: {activeOrderSpec.maxAccounts} TK Facebook /{' '}
-                    {activeOrderSpec.maxGroups.toLocaleString('vi-VN')} nhóm /{' '}
-                    {activeOrderSpec.maxScheduledTasks} tác vụ
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[11px] text-on-surface-variant">Tổng tiền thanh toán</span>
-                  <div className="text-[26px] font-bold text-primary tabular-nums">
-                    {activeOrder.amount.toLocaleString('vi-VN')} VNĐ
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-space-xs bg-surface-container-lowest rounded-lg">
-                <div className="flex items-center justify-between p-space-sm hover:bg-surface-container-low rounded-lg transition-colors">
-                  <div className="flex flex-col">
-                    <span className="text-[11px] text-on-surface-variant">Mã đơn hàng</span>
-                    <span className="text-[13px] font-semibold font-mono text-on-surface">
-                      {activeOrder.id}
-                    </span>
-                  </div>
                   <button
                     type="button"
-                    onClick={() => copyText(activeOrder.id, 'Đã sao chép mã đơn hàng!')}
-                    className="h-7 px-space-md bg-surface-container text-on-surface rounded text-xs hover:bg-surface-container-high transition-colors flex items-center gap-1 font-medium"
+                    onClick={() => setCancelTargetOrder(activeOrder)}
+                    className="h-9 px-3 rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 text-xs font-semibold"
                   >
-                    <span className="material-symbols-outlined text-[14px]">content_copy</span>
-                    <span>Sao chép</span>
+                    Hủy đơn
                   </button>
                 </div>
-
-                <div className="flex items-center justify-between p-space-sm hover:bg-surface-container-low rounded-lg transition-colors">
-                  <div className="flex flex-col">
-                    <span className="text-[11px] text-on-surface-variant">Ngân hàng thụ hưởng</span>
-                    <span className="text-[13px] font-semibold text-on-surface">
-                      MBBank (Quân Đội) - CN Hà Nội
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-secondary">Hỗ trợ 24/7 NAPAS 247</span>
-                </div>
-
-                <div className="flex items-center justify-between p-space-sm hover:bg-surface-container-low rounded-lg transition-colors">
-                  <div className="flex flex-col">
-                    <span className="text-[11px] text-on-surface-variant">Số tài khoản</span>
-                    <span className="text-[18px] font-bold text-on-surface tracking-wider font-mono">
-                      0868889999
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => copyText('0868889999', 'Đã sao chép số tài khoản!')}
-                    className="h-7 px-space-md bg-surface-container text-on-surface rounded text-xs hover:bg-surface-container-high transition-colors flex items-center gap-1 font-medium"
-                  >
-                    <span className="material-symbols-outlined text-[14px]">content_copy</span>
-                    <span>Sao chép</span>
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between p-space-sm hover:bg-surface-container-low rounded-lg transition-colors">
-                  <div className="flex flex-col">
-                    <span className="text-[11px] text-on-surface-variant">
-                      Chủ tài khoản thụ hưởng
-                    </span>
-                    <span className="text-[13px] font-semibold text-on-surface uppercase">
-                      CONG TY FB POST PRO
-                    </span>
-                  </div>
-                  <span className="material-symbols-outlined text-[18px] text-emerald-600">
-                    verified
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-space-sm bg-primary-fixed/30 rounded-lg">
-                  <div className="flex flex-col">
-                    <span className="text-[11px] text-primary font-semibold">
-                      Nội dung chuyển khoản (Bắt buộc chính xác)
-                    </span>
-                    <span className="text-[18px] font-bold text-primary font-mono">
-                      {transferMemo}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => copyText(transferMemo, 'Đã sao chép nội dung chuyển khoản!')}
-                    className="h-7 px-space-md bg-primary-container text-on-primary rounded text-xs hover:bg-primary transition-colors flex items-center gap-1 font-medium shadow-sm whitespace-nowrap"
-                  >
-                    <span className="material-symbols-outlined text-[14px]">content_copy</span>
-                    <span>Sao chép nội dung</span>
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between p-space-sm hover:bg-surface-container-low rounded-lg transition-colors">
-                  <div className="flex flex-col">
-                    <span className="text-[11px] text-on-surface-variant">Số tiền cần chuyển</span>
-                    <span className="text-[18px] font-bold text-primary tabular-nums">
-                      {activeOrder.amount.toLocaleString('vi-VN')} đ
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      copyText(String(activeOrder.amount), 'Đã sao chép số tiền thanh toán!')
-                    }
-                    className="h-7 px-space-md bg-surface-container text-on-surface rounded text-xs hover:bg-surface-container-high transition-colors flex items-center gap-1 font-medium"
-                  >
-                    <span className="material-symbols-outlined text-[14px]">content_copy</span>
-                    <span>Sao chép số tiền</span>
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
+          )}
+        </section>
 
-            <div className="flex flex-wrap items-center justify-between gap-space-md pt-space-md border-t border-surface-container">
-              <div className="flex items-center gap-space-xs text-[11px] text-on-surface-variant">
-                <span className="material-symbols-outlined text-[16px] text-emerald-600">sync</span>
-                <span>
-                  Webhook VietQR sẽ tự xác nhận sau khi nhận thông báo có biến động số dư.
-                </span>
-              </div>
-              <button
-                type="button"
-                disabled={checkingPayment || activeOrder.status === 'PAID'}
-                onClick={handleVerifyClick}
-                className={`h-9 px-space-xl rounded-lg text-[13px] font-semibold flex items-center gap-space-xs shadow-sm transition-colors whitespace-nowrap ${
-                  activeOrder.status === 'PAID'
-                    ? 'bg-emerald-600 text-white cursor-default'
-                    : 'bg-primary-container hover:bg-primary text-on-primary'
-                }`}
-              >
-                <span
-                  className={`material-symbols-outlined text-[18px] ${
-                    checkingPayment ? 'animate-spin' : ''
-                  }`}
-                >
-                  {activeOrder.status === 'PAID' ? 'check_circle' : 'hourglass_bottom'}
-                </span>
-                <span>
-                  {checkingPayment
-                    ? 'Đang kiểm tra giao dịch VietQR...'
-                    : activeOrder.status === 'PAID'
-                    ? 'Đã xác nhận thanh toán'
-                    : 'Kiểm tra trạng thái thanh toán'}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* SECTION 4: Payment Orders History */}
-      <div className="flex flex-col gap-space-md w-full mt-space-md bg-surface-container-lowest rounded-xl p-5 shadow-sm">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-md">
-          <div>
-            <h3 className="text-[18px] text-on-surface font-bold">
-              Lịch sử đơn hàng &amp; Thanh toán
-            </h3>
-            <p className="text-[13px] text-on-surface-variant">
-              Theo dõi chi tiết tất cả các chu kỳ đăng ký gói cước và hóa đơn VAT điện tử
-            </p>
+        {/* Order History Table */}
+        <section className="xl:col-span-7 bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h2 className="text-sm font-bold text-slate-900">
+              Lịch sử đơn hàng ({orders.length})
+            </h2>
           </div>
 
-          <div className="flex flex-wrap items-center gap-space-sm">
-            <div className="relative">
-              <input
-                type="text"
-                value={orderSearch}
-                onChange={(e) => setOrderSearch(e.target.value)}
-                placeholder="Tìm kiếm theo mã đơn..."
-                className="h-8 pl-8 pr-space-md bg-surface-container-low text-on-surface rounded-lg text-[13px] placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary w-52"
-              />
-              <span className="material-symbols-outlined text-[16px] text-outline absolute left-2.5 top-2">
-                search
-              </span>
+          {orders.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500">
+              Chưa có lịch sử giao dịch nào.
             </div>
-            <select
-              value={orderStatusFilter}
-              onChange={(e) => setOrderStatusFilter(e.target.value as any)}
-              className="h-8 px-3 bg-surface-container text-on-surface rounded-lg text-[13px] font-medium focus:outline-none cursor-pointer"
-            >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="PENDING">PENDING</option>
-              <option value="PAID">PAID</option>
-              <option value="EXPIRED">EXPIRED</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="w-full overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-surface-container-low text-on-surface-variant text-xs uppercase tracking-wider h-9">
-                <th className="px-space-md py-space-xs font-semibold rounded-l-lg">Mã đơn hàng</th>
-                <th className="px-space-md py-space-xs font-semibold">Gói dịch vụ</th>
-                <th className="px-space-md py-space-xs font-semibold">Chu kỳ</th>
-                <th className="px-space-md py-space-xs font-semibold">Số tiền</th>
-                <th className="px-space-md py-space-xs font-semibold">Ngày tạo</th>
-                <th className="px-space-md py-space-xs font-semibold">Ngày thanh toán</th>
-                <th className="px-space-md py-space-xs font-semibold">Trạng thái</th>
-                <th className="px-space-md py-space-xs font-semibold text-right rounded-r-lg">
-                  Thao tác
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-container text-[13px] text-on-surface">
-              {filteredOrders.map((order) => {
-                const isExpired = order.status === 'EXPIRED';
-                const isPending = order.status === 'PENDING';
-                return (
-                  <tr
-                    key={order.id}
-                    className={`hover:bg-surface-container-low/50 transition-colors h-11 ${
-                      isPending ? 'bg-primary-fixed/10' : ''
-                    }`}
-                  >
-                    <td
-                      className={`px-space-md py-space-xs font-semibold font-mono ${
-                        isPending
-                          ? 'text-primary'
-                          : isExpired
-                          ? 'text-outline'
-                          : 'text-on-surface'
-                      }`}
-                    >
-                      {order.id}
-                    </td>
-                    <td
-                      className={`px-space-md py-space-xs font-medium ${
-                        isExpired ? 'text-outline' : ''
-                      }`}
-                    >
-                      <span className="inline-flex items-center gap-1.5">
-                        <span
-                          className={`w-2 h-2 rounded-full ${
-                            order.plan === 'BUSINESS'
-                              ? 'bg-blue-600'
-                              : order.plan === 'PRO'
-                              ? 'bg-blue-500'
-                              : 'bg-slate-400'
-                          }`}
-                        />
-                        {PLAN_SPECS[order.plan].name}
-                      </span>
-                    </td>
-                    <td
-                      className={`px-space-md py-space-xs ${
-                        isExpired ? 'text-outline' : 'text-on-surface-variant'
-                      }`}
-                    >
-                      {order.cycle === 'yearly' ? '1 Năm (Yearly)' : '1 Tháng (Monthly)'}
-                    </td>
-                    <td
-                      className={`px-space-md py-space-xs font-semibold tabular-nums ${
-                        isExpired ? 'text-outline' : 'text-on-surface'
-                      }`}
-                    >
-                      {order.amount.toLocaleString('vi-VN')} đ
-                    </td>
-                    <td
-                      className={`px-space-md py-space-xs tabular-nums ${
-                        isExpired ? 'text-outline' : 'text-on-surface-variant'
-                      }`}
-                    >
-                      {order.createdAt}
-                    </td>
-                    <td
-                      className={`px-space-md py-space-xs tabular-nums ${
-                        order.status === 'PAID'
-                          ? 'font-medium text-emerald-700'
-                          : 'text-on-surface-variant'
-                      }`}
-                    >
-                      {order.paidAt}
-                    </td>
-                    <td className="px-space-md py-space-xs">
-                      {order.status === 'PENDING' && (
-                        <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-1.5 py-[2px] rounded text-xs font-semibold whitespace-nowrap">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
-                          PENDING (Chờ thanh toán)
-                        </span>
-                      )}
-                      {order.status === 'PAID' && (
-                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-1.5 py-[2px] rounded text-xs font-semibold whitespace-nowrap">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          PAID (Đã thanh toán)
-                        </span>
-                      )}
-                      {order.status === 'EXPIRED' && (
-                        <span className="inline-flex items-center gap-1 bg-surface-container text-on-surface-variant px-1.5 py-[2px] rounded text-xs font-medium whitespace-nowrap">
-                          EXPIRED (Hết hạn)
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-space-md py-space-xs text-right">
-                      {order.status === 'PENDING' && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedOrderId(order.id);
-                            checkoutRef.current?.scrollIntoView({ behavior: 'smooth' });
-                          }}
-                          className="h-7 px-space-sm bg-primary-container text-on-primary rounded text-xs hover:bg-primary transition-colors font-medium whitespace-nowrap"
-                        >
-                          Thanh toán ngay
-                        </button>
-                      )}
-                      {order.status === 'PAID' && (
-                        <div className="inline-flex items-center gap-space-xs">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              onNotify('success', `Đang tải hóa đơn VAT điện tử cho ${order.id}.`)
-                            }
-                            className="w-7 h-7 flex items-center justify-center rounded bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface"
-                            title="Tải hóa đơn VAT"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">download</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setInvoiceModalOrder(order)}
-                            className="w-7 h-7 flex items-center justify-center rounded bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface"
-                            title="Xem chi tiết giao dịch"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">
-                              visibility
-                            </span>
-                          </button>
-                        </div>
-                      )}
-                      {order.status === 'EXPIRED' && (
-                        <span className="h-7 px-space-sm inline-flex items-center bg-surface-container-low text-outline rounded text-xs cursor-not-allowed">
-                          Đã hủy
-                        </span>
-                      )}
-                    </td>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Mã đơn</th>
+                    <th className="px-4 py-3 font-semibold">Gói</th>
+                    <th className="px-4 py-3 font-semibold">Số tiền</th>
+                    <th className="px-4 py-3 font-semibold">Trạng thái</th>
+                    <th className="px-4 py-3 font-semibold">Ngày tạo (GMT+7)</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex items-center justify-between pt-space-sm text-[11px] text-on-surface-variant">
-          <span>
-            Hiển thị {filteredOrders.length} trên {orders.length} đơn hàng gần nhất
-          </span>
-          <div className="flex items-center gap-space-xs">
-            <button
-              type="button"
-              disabled
-              className="h-7 px-space-sm rounded bg-surface-container-low text-outline cursor-not-allowed font-medium"
-            >
-              Trước
-            </button>
-            <span className="px-space-sm py-1 bg-primary text-on-primary rounded font-semibold text-xs">
-              1
-            </span>
-            <button
-              type="button"
-              disabled
-              className="h-7 px-space-sm rounded bg-surface-container-low text-outline cursor-not-allowed font-medium"
-            >
-              Sau
-            </button>
-          </div>
-        </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {orders.map((ord) => {
+                    const meta = ORDER_STATUS_META[ord.status];
+                    const isSelected = activeOrder?.id === ord.id;
+                    return (
+                      <tr
+                        key={ord.id}
+                        onClick={() => setSelectedOrderId(ord.id)}
+                        className={`cursor-pointer transition-colors ${
+                          isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50/70'
+                        }`}
+                      >
+                        <td className="px-4 py-3 font-mono font-semibold text-slate-900">
+                          {ord.orderCode}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {planMap.get(ord.planId)?.name ?? ord.planId}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-slate-900 tabular-nums">
+                          {formatVnd(ord.amountVnd)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${meta.badgeClass}`}
+                          >
+                            {meta.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">
+                          {formatVietnamDateTime(ord.createdAt)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </div>
 
-      {/* Security & Support Footer Notes */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-space-lg pt-space-sm text-on-surface-variant">
-        <div className="flex items-start gap-space-sm bg-surface-container-lowest p-space-md rounded-xl shadow-sm">
-          <span className="material-symbols-outlined text-primary text-[24px]">shield</span>
-          <div>
-            <h4 className="text-[13px] text-on-surface font-semibold">Tự động kích hoạt</h4>
-            <p className="text-[11px] text-on-surface-variant mt-0.5 leading-relaxed">
-              Sau khi tiền vào tài khoản, hệ thống tự động ghi nhận thanh toán trong 30 giây mà
-              không cần can thiệp thủ công.
-            </p>
-          </div>
-        </div>
-        <div className="flex items-start gap-space-sm bg-surface-container-lowest p-space-md rounded-xl shadow-sm">
-          <span className="material-symbols-outlined text-primary text-[24px]">receipt_long</span>
-          <div>
-            <h4 className="text-[13px] text-on-surface font-semibold">Hóa đơn điện tử VAT</h4>
-            <p className="text-[11px] text-on-surface-variant mt-0.5 leading-relaxed">
-              Hóa đơn hợp lệ theo Thông tư 78/2021/TT-BTC gửi thẳng về email doanh nghiệp sau khi
-              thanh toán.
-            </p>
-          </div>
-        </div>
-        <div className="flex items-start gap-space-sm bg-surface-container-lowest p-space-md rounded-xl shadow-sm">
-          <span className="material-symbols-outlined text-primary text-[24px]">support_agent</span>
-          <div>
-            <h4 className="text-[13px] text-on-surface font-semibold">Hỗ trợ kỹ thuật 24/7</h4>
-            <p className="text-[11px] text-on-surface-variant mt-0.5 leading-relaxed">
-              Khi cần điều chỉnh hạn mức nhóm chuyên biệt hoặc xử lý giao dịch chậm, hotline Zalo kỹ
-              thuật luôn sẵn sàng.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Transaction Detail Modal */}
-      {invoiceModalOrder && (
-        <div className="fixed inset-0 z-[85] flex items-center justify-center bg-inverse-surface/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md bg-surface-container-lowest rounded-xl shadow-2xl overflow-hidden border border-surface-container">
-            <div className="px-5 py-3.5 bg-surface-container-low flex items-center justify-between">
-              <h4 className="text-sm font-bold text-on-surface">
-                Chi tiết giao dịch {invoiceModalOrder.id}
-              </h4>
-              <button
-                type="button"
-                onClick={() => setInvoiceModalOrder(null)}
-                className="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center"
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            </div>
-            <div className="p-5 flex flex-col gap-2.5 text-xs">
-              <div className="flex justify-between py-1 border-b border-surface-container">
-                <span className="text-on-surface-variant">Gói đăng ký:</span>
-                <span className="font-semibold text-on-surface">
-                  {PLAN_SPECS[invoiceModalOrder.plan].name} ({invoiceModalOrder.cycle})
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-surface-container">
-                <span className="text-on-surface-variant">Số tiền thanh toán:</span>
-                <span className="font-bold text-primary tabular-nums">
-                  {invoiceModalOrder.amount.toLocaleString('vi-VN')} đ
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-surface-container">
-                <span className="text-on-surface-variant">Kênh thanh toán:</span>
-                <span className="font-medium text-on-surface">
-                  VietQR • {invoiceModalOrder.bankName || 'MBBank'}
-                </span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-on-surface-variant">Thời điểm xác nhận:</span>
-                <span className="font-mono text-emerald-700 font-semibold">
-                  {invoiceModalOrder.paidAt}
-                </span>
-              </div>
-            </div>
-            <div className="px-5 py-3 bg-surface-container-low flex justify-end">
-              <button
-                type="button"
-                onClick={() => setInvoiceModalOrder(null)}
-                className="h-8 px-4 rounded-lg bg-primary-container text-on-primary text-xs font-semibold"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={Boolean(cancelTargetOrder)}
+        title="Hủy đơn thanh toán đang chờ?"
+        description={`Đơn hàng ${cancelTargetOrder?.orderCode ?? ''} sẽ chuyển sang trạng thái Đã hủy (CANCELLED).`}
+        confirmLabel="Hủy đơn hàng"
+        onCancel={() => setCancelTargetOrder(null)}
+        onConfirm={() => {
+          if (cancelTargetOrder) {
+            cancelPaymentOrder(cancelTargetOrder.id);
+            addToast('info', 'Đã hủy đơn hàng', cancelTargetOrder.orderCode);
+          }
+          setCancelTargetOrder(null);
+        }}
+      />
     </div>
   );
 };

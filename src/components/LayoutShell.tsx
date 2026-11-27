@@ -1,364 +1,318 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { PlanTier, RouteKey } from '../types/app';
-import { LOGO_URL, USER_AVATAR_URL } from '../data/mockData';
-import { SafeImage } from './SafeImage';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useApp } from '../state/AppContext';
+import { ChangePasswordModal } from './ChangePasswordModal';
 
 interface LayoutShellProps {
-  activeRoute: RouteKey;
-  onNavigate: (route: RouteKey) => void;
-  currentPlan: PlanTier;
-  extensionConnected: boolean;
-  userName: string;
-  onOpenChangePassword: () => void;
-  onOpenExtensionGuide: () => void;
   children: React.ReactNode;
 }
 
-const ROUTE_META: Record<Exclude<RouteKey, 'auth'>, { title: string; subtitle: string }> = {
-  dashboard: {
-    title: 'Tổng quan',
-    subtitle: 'Theo dõi tác vụ đăng bài và lịch phát hành tự động',
-  },
-  post: {
-    title: 'Đăng bài Facebook',
-    subtitle: 'Soạn thảo đa kịch bản & phân phối tới nhóm/fanpage',
-  },
-  accounts: {
-    title: 'Tài khoản Facebook',
-    subtitle: 'Quản lý hồ sơ Facebook, Fanpage và thiết bị Extension',
-  },
-  pricing: {
-    title: 'Gói dịch vụ & Thanh toán',
-    subtitle: 'Quản lý hạn mức tài nguyên và thanh toán VietQR tự động',
-  },
-  admin: {
-    title: 'Quản trị hệ thống',
-    subtitle: 'Giám sát người dùng, tác vụ nền và cấu hình toàn hệ thống',
-  },
-  extension: {
-    title: 'Chrome Extension Popup',
-    subtitle: 'Mô phỏng tiện ích Manifest V3 và cấu hình chống Checkpoint',
-  },
-};
-
-export const LayoutShell: React.FC<LayoutShellProps> = ({
-  activeRoute,
-  onNavigate,
-  currentPlan,
-  extensionConnected,
-  userName,
-  onOpenChangePassword,
-  onOpenExtensionGuide,
-  children,
-}) => {
-  const [collapsed, setCollapsed] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
+export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
+  const { currentUser, currentPlan, usageSummary, devices, logout, resetDemoData, addToast } =
+    useApp();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const hasConnectedDevice = devices.some((d) => d.connectionStatus === 'CONNECTED');
+  const isAdmin = currentUser?.role === 'ADMIN';
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setUserMenuOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setProfileOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setUserMenuOpen(false);
+        setMobileMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKey);
+    };
   }, []);
 
-  const meta = activeRoute === 'auth' ? ROUTE_META.dashboard : ROUTE_META[activeRoute];
-
-  const primaryNav: { key: RouteKey; label: string; icon: string }[] = [
-    { key: 'dashboard', label: 'Tổng quan', icon: 'space_dashboard' },
-    { key: 'post', label: 'Đăng bài Facebook', icon: 'edit_square' },
-    { key: 'accounts', label: 'Tài khoản Facebook', icon: 'group' },
-    { key: 'pricing', label: 'Gói dịch vụ', icon: 'account_balance_wallet' },
+  const navItems = [
+    { to: '/post', label: 'Đăng bài', icon: 'edit_square' },
+    { to: '/dashboard', label: 'Tổng quan & Lịch', icon: 'calendar_month' },
+    { to: '/accounts', label: 'Tài khoản', icon: 'manage_accounts' },
+    { to: '/pricing', label: 'Gói dịch vụ', icon: 'workspace_premium' },
+    ...(isAdmin ? [{ to: '/admin', label: 'Quản trị', icon: 'admin_panel_settings' }] : []),
   ];
 
-  const systemNav: { key: RouteKey; label: string; icon: string }[] = [
-    { key: 'extension', label: 'Extension Popup', icon: 'extension' },
-    { key: 'admin', label: 'Quản trị hệ thống', icon: 'admin_panel_settings' },
-  ];
-
-  const renderNavItem = (item: { key: RouteKey; label: string; icon: string }) => {
-    const isActive = activeRoute === item.key;
-    return (
-      <div key={item.key} className="relative group w-full">
-        <button
-          type="button"
-          onClick={() => {
-            onNavigate(item.key);
-            setMobileMenuOpen(false);
-          }}
-          className={`w-full flex items-center ${
-            collapsed ? 'justify-center px-0 h-11' : 'gap-space-md px-space-md py-space-sm'
-          } rounded-lg transition-colors text-[13px] whitespace-nowrap ${
-            isActive
-              ? 'bg-[#EFF6FF] text-[#2563EB] font-semibold'
-              : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface font-medium'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[20px] shrink-0">{item.icon}</span>
-          {!collapsed && <span className="truncate">{item.label}</span>}
-        </button>
-        {collapsed && (
-          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center px-2.5 py-1 bg-inverse-surface text-inverse-on-surface text-xs rounded shadow-md whitespace-nowrap z-50 pointer-events-none">
-            {item.label}
-          </div>
-        )}
-      </div>
-    );
+  const handleLogout = () => {
+    logout();
+    addToast('info', 'Đã đăng xuất', 'Phiên làm việc hiện tại đã được xóa.');
+    navigate('/login', { replace: true });
   };
 
+  const initials = currentUser
+    ? currentUser.fullName
+        .split(' ')
+        .filter(Boolean)
+        .slice(-2)
+        .map((w) => w[0]?.toUpperCase() ?? '')
+        .join('')
+    : 'U';
+
   return (
-    <div className="min-h-screen bg-surface text-on-surface">
-      {/* Mobile Sidebar Backdrop */}
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-inverse-surface/40 backdrop-blur-xs z-40 lg:hidden"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
-
-      {/* Left Sidebar */}
-      <aside
-        className={`fixed left-0 top-0 h-full bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between py-space-md px-space-md transition-all duration-200 ${
-          collapsed ? 'w-[72px] px-space-xs' : 'w-60'
-        } ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
-      >
-        <div className="flex flex-col gap-space-lg">
-          {/* Brand Header */}
-          <div
-            className={`h-12 w-full flex items-center ${
-              collapsed ? 'justify-center' : 'justify-between px-space-xs'
-            }`}
-          >
-            <button
-              type="button"
-              onClick={() => onNavigate('dashboard')}
-              className="flex items-center gap-space-sm text-left"
-            >
-              {collapsed ? (
-                <div className="w-9 h-9 rounded-lg bg-primary-container/10 flex items-center justify-center overflow-hidden">
-                  <SafeImage
-                    src={LOGO_URL}
-                    alt="FB POST PRO"
-                    fallbackText="FB"
-                    className="h-7 w-7 object-contain"
-                  />
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+      {/* Top Header */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80">
+        <div className="max-w-[1440px] mx-auto px-4 lg:px-6 h-16 flex items-center justify-between gap-3">
+          {/* Brand + Nav */}
+          <div className="flex items-center gap-4 min-w-0">
+            <Link to="/post" className="flex items-center gap-2.5 shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-xs">
+                <span className="material-symbols-outlined text-[20px]">send</span>
+              </div>
+              <div className="leading-tight">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-[15px] tracking-tight text-slate-900">
+                    FB POST PRO
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wide">
+                    DEMO
+                  </span>
                 </div>
-              ) : (
-                <span className="text-[18px] font-bold tracking-tight text-primary-container whitespace-nowrap">
-                  FB POST PRO
-                </span>
-              )}
-            </button>
-            {!collapsed && (
-              <span className="text-[11px] text-primary-container bg-secondary-container/40 px-1.5 py-[2px] rounded font-medium tabular-nums">
-                v1.2.4
-              </span>
-            )}
+                <p className="text-[11px] text-slate-500 hidden xl:block">
+                  Quản lý nội dung &amp; lịch đăng
+                </p>
+              </div>
+            </Link>
+
+            <nav className="hidden lg:flex items-center gap-1" aria-label="Điều hướng chính">
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    `px-2.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap ${
+                      isActive
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`
+                  }
+                >
+                  <span className="material-symbols-outlined text-[17px]">{item.icon}</span>
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+            </nav>
           </div>
 
-          {/* Primary Navigation */}
-          <nav className="flex flex-col gap-space-xs w-full">
-            {primaryNav.map(renderNavItem)}
-          </nav>
-        </div>
-
-        {/* Bottom System Navigation */}
-        <div className="flex flex-col gap-space-xs w-full">
-          {!collapsed && (
-            <div className="px-space-xs pt-space-xs">
-              <span className="text-[11px] uppercase tracking-wider text-outline font-semibold">
-                Hệ thống
-              </span>
-            </div>
-          )}
-          <nav className="flex flex-col gap-space-xs w-full">
-            {systemNav.map(renderNavItem)}
-          </nav>
-          <div className="pt-2 border-t border-surface-container mt-1 hidden lg:block">
-            <button
-              type="button"
-              onClick={() => setCollapsed((prev) => !prev)}
-              className={`w-full flex items-center ${
-                collapsed ? 'justify-center h-10' : 'gap-space-md px-space-md py-space-sm'
-              } rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors text-[12px] font-medium`}
-              title={collapsed ? 'Mở rộng thanh công cụ' : 'Thu gọn thanh công cụ'}
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                {collapsed ? 'keyboard_double_arrow_right' : 'keyboard_double_arrow_left'}
-              </span>
-              {!collapsed && <span>Thu gọn menu</span>}
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content Container */}
-      <div className={`transition-all duration-200 ${collapsed ? 'lg:pl-[72px]' : 'lg:pl-60'}`}>
-        {/* Fixed Top Header */}
-        <header
-          className={`fixed top-0 right-0 h-[60px] bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-4 lg:px-space-xl transition-all duration-200 left-0 ${
-            collapsed ? 'lg:left-[72px]' : 'lg:left-60'
-          }`}
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-on-surface"
-              aria-label="Mở menu"
-            >
-              <span className="material-symbols-outlined text-[20px]">menu</span>
-            </button>
-            <div className="flex flex-col justify-center min-w-0">
-              <h1 className="text-[17px] text-on-surface tracking-tight font-semibold leading-tight truncate">
-                {meta.title}
-              </h1>
-              <p className="text-[11px] text-on-surface-variant leading-none mt-0.5 truncate hidden sm:block">
-                {meta.subtitle}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 lg:gap-space-lg shrink-0">
-            <button
-              type="button"
-              onClick={() => onNavigate('extension')}
-              className="hidden sm:inline-flex items-center gap-space-xs bg-surface-container-low hover:bg-surface-container px-space-md py-space-xs rounded-lg transition-colors whitespace-nowrap shrink-0"
-              title="Mở mô phỏng Extension Popup"
+          {/* Right controls */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <Link
+              to="/extension-preview"
+              title="Xem trước giao diện Popup Extension (chế độ dev/preview)"
+              className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                location.pathname === '/extension-preview'
+                  ? 'bg-blue-50 border-blue-200 text-blue-700'
+                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}
             >
               <span
                 className={`w-2 h-2 rounded-full ${
-                  extensionConnected ? 'bg-emerald-500' : 'bg-rose-500'
+                  hasConnectedDevice ? 'bg-emerald-500' : 'bg-slate-400'
                 }`}
               />
-              <span className="text-xs text-on-surface font-medium">
-                {extensionConnected ? 'Đã kết nối' : 'Mất kết nối'}
+              <span>
+                Extension: {hasConnectedDevice ? 'Đã kết nối' : 'Chưa kết nối'}
               </span>
-              <span className="text-[11px] text-on-surface-variant bg-surface-container px-1.5 rounded tabular-nums">
-                v1.2.4
+              <span className="text-[10px] text-slate-400 border-l border-slate-200 pl-1.5">
+                Preview
               </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onOpenExtensionGuide}
-              className="hidden md:flex h-8 px-space-lg bg-surface-container-low text-on-surface text-[13px] rounded-lg hover:bg-surface-container-high transition-colors items-center gap-space-xs font-medium whitespace-nowrap shrink-0"
-            >
-              <span className="material-symbols-outlined text-[16px]">extension</span>
-              <span>Cài đặt Extension</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onNavigate('pricing')}
-              className="h-8 px-space-lg bg-primary-container text-on-primary text-[13px] rounded-lg hover:bg-primary transition-colors flex items-center gap-space-xs font-medium whitespace-nowrap shrink-0"
-            >
-              <span className="material-symbols-outlined text-[16px]">bolt</span>
-              <span>Mua gói</span>
-            </button>
-
-            <div className="h-6 w-[1px] bg-surface-container-highest hidden sm:block" />
+            </Link>
 
             {/* User Profile Dropdown */}
-            <div className="relative" ref={dropdownRef}>
-              <button
-                type="button"
-                onClick={() => setProfileOpen((prev) => !prev)}
-                className="flex items-center gap-space-md pl-space-xs cursor-pointer group rounded-lg py-1 pr-1 hover:bg-surface-container-low/70 transition-colors"
-              >
-                <SafeImage
-                  src={USER_AVATAR_URL}
-                  alt={userName}
-                  fallbackText="NA"
-                  className="w-8 h-8 rounded-full object-cover ring-1 ring-surface-container-highest shrink-0"
-                />
-                <div className="hidden sm:flex flex-col text-left">
-                  <span className="text-[13px] text-on-surface font-medium leading-tight whitespace-nowrap">
-                    {userName}
-                  </span>
-                  <span className="text-[11px] text-primary font-medium leading-none mt-0.5">
-                    Gói {currentPlan}
-                  </span>
-                </div>
-                <span className="material-symbols-outlined text-[18px] text-on-surface-variant group-hover:text-on-surface transition-colors">
-                  arrow_drop_down
-                </span>
-              </button>
-
-              {profileOpen && (
-                <div className="absolute right-0 mt-2 w-60 bg-surface-container-lowest rounded-xl shadow-xl border border-surface-container py-1.5 z-50">
-                  <div className="px-3.5 py-2 border-b border-surface-container">
-                    <p className="text-xs font-semibold text-on-surface">{userName}</p>
-                    <p className="text-[11px] text-on-surface-variant">
-                      nguyenminhanh@company.com · Gói {currentPlan}
+            {currentUser && (
+              <div className="relative" ref={menuRef}>
+                <button
+                  type="button"
+                  onClick={() => setUserMenuOpen((o) => !o)}
+                  aria-expanded={userMenuOpen}
+                  aria-haspopup="menu"
+                  className="flex items-center gap-2.5 pl-1.5 pr-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-md bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
+                    {initials}
+                  </div>
+                  <div className="hidden sm:block text-left leading-tight max-w-[140px]">
+                    <p className="text-xs font-semibold text-slate-900 truncate">
+                      {currentUser.fullName}
+                    </p>
+                    <p className="text-[11px] text-slate-500 truncate">
+                      {usageSummary.isActive && currentPlan
+                        ? currentPlan.name
+                        : 'Gói hết hạn / Chưa kích hoạt'}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProfileOpen(false);
-                      onNavigate('pricing');
-                    }}
-                    className="w-full px-3.5 py-2 text-left text-xs text-on-surface hover:bg-surface-container-low flex items-center gap-2.5"
-                  >
-                    <span className="material-symbols-outlined text-[16px] text-primary">
-                      workspace_premium
-                    </span>
-                    <span>Quản lý gói dịch vụ</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProfileOpen(false);
-                      onOpenChangePassword();
-                    }}
-                    className="w-full px-3.5 py-2 text-left text-xs text-on-surface hover:bg-surface-container-low flex items-center gap-2.5"
-                  >
-                    <span className="material-symbols-outlined text-[16px] text-secondary">
-                      lock_reset
-                    </span>
-                    <span>Đổi mật khẩu</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProfileOpen(false);
-                      onNavigate('admin');
-                    }}
-                    className="w-full px-3.5 py-2 text-left text-xs text-on-surface hover:bg-surface-container-low flex items-center gap-2.5"
-                  >
-                    <span className="material-symbols-outlined text-[16px] text-secondary">
-                      admin_panel_settings
-                    </span>
-                    <span>Quản trị hệ thống</span>
-                  </button>
-                  <div className="my-1 border-t border-surface-container" />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProfileOpen(false);
-                      onNavigate('auth');
-                    }}
-                    className="w-full px-3.5 py-2 text-left text-xs text-error hover:bg-error-container/30 flex items-center gap-2.5 font-medium"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">logout</span>
-                    <span>Đăng xuất / Trang xác thực</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
+                  <span className="material-symbols-outlined text-[18px] text-slate-400">
+                    expand_more
+                  </span>
+                </button>
 
-        {/* Main Viewport */}
-        <main className="w-full pt-[76px] px-4 lg:px-[20px] pb-[28px] bg-surface min-h-screen">
-          {children}
-        </main>
-      </div>
+                {userMenuOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50"
+                  >
+                    <div className="px-4 py-2.5 border-b border-slate-100">
+                      <p className="text-xs font-bold text-slate-900 truncate">
+                        {currentUser.fullName}
+                      </p>
+                      <p className="text-[11px] text-slate-500 truncate">{currentUser.email}</p>
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-semibold">
+                          {isAdmin ? 'ADMIN' : 'CUSTOMER'}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                            usageSummary.isActive
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-rose-50 text-rose-700'
+                          }`}
+                        >
+                          {usageSummary.isActive && currentPlan
+                            ? `${currentPlan.code} (${usageSummary.daysRemaining} ngày)`
+                            : 'Hết hạn gói'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="py-1">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setChangePasswordOpen(true);
+                        }}
+                        className="w-full px-4 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2.5"
+                      >
+                        <span className="material-symbols-outlined text-[17px] text-slate-400">
+                          key
+                        </span>
+                        Đổi mật khẩu
+                      </button>
+
+                      <Link
+                        to="/extension-preview"
+                        role="menuitem"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="w-full px-4 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2.5"
+                      >
+                        <span className="material-symbols-outlined text-[17px] text-slate-400">
+                          extension
+                        </span>
+                        Xem trước Extension Popup
+                      </Link>
+
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          resetDemoData();
+                        }}
+                        className="w-full px-4 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2.5"
+                      >
+                        <span className="material-symbols-outlined text-[17px] text-slate-400">
+                          restart_alt
+                        </span>
+                        Đặt lại dữ liệu DEMO
+                      </button>
+                    </div>
+
+                    <div className="pt-1 border-t border-slate-100">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={handleLogout}
+                        className="w-full px-4 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5"
+                      >
+                        <span className="material-symbols-outlined text-[17px]">logout</span>
+                        Đăng xuất
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Mobile Hamburger */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((o) => !o)}
+              aria-label="Mở menu điều hướng"
+              className="lg:hidden w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-100"
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                {mobileMenuOpen ? 'close' : 'menu'}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Nav Drawer */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden border-t border-slate-200 bg-white px-4 py-3 space-y-1">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${
+                    isActive
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`
+                }
+              >
+                <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
+            <NavLink
+              to="/extension-preview"
+              className={({ isActive }) =>
+                `px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${
+                  isActive
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`
+              }
+            >
+              <span className="material-symbols-outlined text-[18px]">extension</span>
+              <span>Extension Popup Preview</span>
+            </NavLink>
+          </div>
+        )}
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 w-full max-w-[1440px] mx-auto px-4 lg:px-6 py-5">
+        {children}
+      </main>
+
+      <ChangePasswordModal
+        open={changePasswordOpen}
+        onClose={() => setChangePasswordOpen(false)}
+      />
     </div>
   );
 };

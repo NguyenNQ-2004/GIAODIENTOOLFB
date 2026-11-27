@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 interface SafeImageProps {
-  src?: string;
+  src?: string | null;
   alt: string;
   fallbackText?: string;
   fallbackIcon?: string;
@@ -15,7 +15,7 @@ export const SafeImage: React.FC<SafeImageProps> = ({
   fallbackText,
   fallbackIcon = 'image',
   className = 'w-full h-full object-cover',
-  fallbackClassName = 'bg-primary-container/15 text-primary-container',
+  fallbackClassName = 'bg-blue-50 text-blue-700',
 }) => {
   const [failed, setFailed] = useState(false);
 

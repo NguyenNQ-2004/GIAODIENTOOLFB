@@ -1,0 +1,101 @@
+import type {
+  DeviceConnectionStatus,
+  ExtensionDevice,
+  FacebookAccount,
+  FacebookGroup,
+  Plan,
+  PublishingTask,
+  Subscription,
+} from '../types/domain';
+import type { SubscriptionUsageSummary } from '../types/viewModels';
+import { getVietnamDateKey, getVietnamTodayKey } from './dateTime';
+
+export const DEVICE_ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
+export function generateId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Safe fallback for environments without randomUUID
+  return `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function formatVnd(amount: number): string {
+  return `${new Intl.NumberFormat('vi-VN').format(Math.round(amount))}₫`;
+}
+
+export function formatFileSize(sizeBytes: number): string {
+  if (sizeBytes < 1024) return `${sizeBytes} B`;
+  const kb = sizeBytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(1)} MB`;
+}
+
+export function formatMemberCount(count: number | null): string {
+  if (count === null || count === undefined) return 'Chưa rõ';
+  return new Intl.NumberFormat('vi-VN').format(count);
+}
+
+/**
+ * Computes ExtensionDevice connection status strictly from revokedAt & lastSeenAt.
+ * Revoked devices can never appear CONNECTED or OFFLINE.
+ */
+export function computeDeviceConnectionStatus(
+  device: Pick<ExtensionDevice, 'revokedAt' | 'lastSeenAt'>,
+  now: Date = new Date()
+): DeviceConnectionStatus {
+  if (device.revokedAt) return 'REVOKED';
+  if (!device.lastSeenAt) return 'OFFLINE';
+  const lastSeenMs = new Date(device.lastSeenAt).getTime();
+  if (Number.isNaN(lastSeenMs)) return 'OFFLINE';
+  return now.getTime() - lastSeenMs <= DEVICE_ONLINE_THRESHOLD_MS ? 'CONNECTED' : 'OFFLINE';
+}
+
+export function isSubscriptionActive(
+  subscription: Subscription | null | undefined,
+  now: Date = new Date()
+): boolean {
+  if (!subscription) return false;
+  if (subscription.status !== 'ACTIVE') return false;
+  const endsMs = new Date(subscription.endsAt).getTime();
+  if (Number.isNaN(endsMs)) return false;
+  return endsMs > now.getTime();
+}
+
+export function computeSubscriptionUsage(params: {
+  subscription: Subscription | null;
+  plan: Plan | null;
+  accounts: FacebookAccount[];
+  groups: FacebookGroup[];
+  tasks: PublishingTask[];
+  now?: Date;
+}): SubscriptionUsageSummary {
+  const now = params.now ?? new Date();
+  const active = isSubscriptionActive(params.subscription, now);
+  const daysRemaining =
+    active && params.subscription
+      ? Math.max(0, Math.ceil((new Date(params.subscription.endsAt).getTime() - now.getTime()) / 86_400_000))
+      : 0;
+
+  const todayKey = getVietnamTodayKey(now);
+  const scheduledTodayUsed = params.tasks.filter((t) => {
+    const refTime = t.scheduledAt ?? t.createdAt;
+    return getVietnamDateKey(refTime) === todayKey && t.status !== 'CANCELLED';
+  }).length;
+
+  const activeAccountsCount = params.accounts.filter((a) => a.status !== 'DISCONNECTED').length;
+
+  return {
+    plan: params.plan,
+    subscription: params.subscription,
+    isActive: active,
+    daysRemaining,
+    accountsUsed: activeAccountsCount,
+    accountsLimit: params.plan?.maxFacebookAccounts ?? 0,
+    groupsUsed: params.groups.length,
+    groupsLimit: params.plan?.maxGroups ?? 0,
+    scheduledTodayUsed,
+    scheduledTodayLimit: params.plan?.maxScheduledTasksPerDay ?? 0,
+  };
+}

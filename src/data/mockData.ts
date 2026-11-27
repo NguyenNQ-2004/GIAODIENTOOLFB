@@ -1,873 +1,801 @@
-import {
-  AdminUser,
+import type {
+  AuditLog,
   ExtensionDevice,
-  ExtensionSettings,
   FacebookAccount,
   FacebookGroup,
-  Fanpage,
+  FacebookPage,
   GroupCollection,
+  GroupCollectionItem,
   PaymentOrder,
-  PlanTier,
-  PostSlot,
+  Plan,
+  Post,
   PublishingTask,
-  SavedPost,
-} from '../types/app';
+  Subscription,
+  User,
+} from '../types/domain';
+import { addDaysIso, addMinutesIso } from '../utils/dateTime';
+import { deriveTaskStatus } from '../utils/taskStatus';
 
-export const USER_AVATAR_URL =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuDoPt2G-DdhuVSX23NxMldNzHQLvBXK1wtA3lygmb_hJb16EDKYH5JRR9JYpMPGln0xklIblxyRfEqPqYgboDI8SA3h3bffhPD-24kQ9R7UZ-eTqU1MljiSTG811g4dvtgpe7rxZNcMxqZB2_XCQIXeA5P6rDTTtk4GaTDvvah5d6EkmvL0ga_x60iszCTiMK2fxac7-B993d0rjfhBsnhAXjAvZ-oP_svzZpPworo';
+export interface DemoDatabase {
+  users: User[];
+  plans: Plan[];
+  subscriptions: Subscription[];
+  accounts: FacebookAccount[];
+  pages: FacebookPage[];
+  groups: FacebookGroup[];
+  collections: GroupCollection[];
+  collectionItems: GroupCollectionItem[];
+  posts: Post[];
+  tasks: PublishingTask[];
+  devices: ExtensionDevice[];
+  orders: PaymentOrder[];
+  auditLogs: AuditLog[];
+}
 
-export const LOGO_URL =
-  'https://lh3.googleusercontent.com/aida/ALJJyrC8YcWag9WvkzQF1Du3RhZD1Au_70ACnNC-8BGhbDpm9hKzrLSRICGzV4ZmkmlDi0QnIYgbkeo8ANDAXXONM_tQiCqDAMwrKCsdEbXcsvSV8jRTObwthWw69i9NbIFvXqlpPRPTHsdKBCLNAQKff9h_hNPlsyFJX3CMmUiEVrPsGAo5HGkOrAhZCPMQCns6hlSFNb2ameuSQFyt713QrAGXdDdHJVea9-B7En4q_J5T';
+export interface DemoCredentialInfo {
+  userId: string;
+  email: string;
+  label: string;
+  role: 'CUSTOMER' | 'ADMIN';
+  description: string;
+}
 
-export const PLAN_SPECS: Record<
-  PlanTier,
+export const DEMO_ACCOUNTS: DemoCredentialInfo[] = [
   {
-    name: string;
-    badge: string;
-    description: string;
-    monthlyPrice: number;
-    yearlyPrice: number;
-    maxAccounts: number;
-    maxGroups: number;
-    maxScheduledTasks: number;
-    dailyPostLimit: number;
-  }
-> = {
-  BASIC: {
-    name: 'Gói BASIC',
-    badge: 'Khởi sự',
-    description: 'Thích hợp cho cá nhân kinh doanh đơn lẻ mới bắt đầu tiếp cận nhóm tự động.',
-    monthlyPrice: 49000,
-    yearlyPrice: 490000,
-    maxAccounts: 1,
-    maxGroups: 100,
-    maxScheduledTasks: 3,
-    dailyPostLimit: 50,
-  },
-  PRO: {
-    name: 'Gói PRO',
-    badge: 'Phổ biến nhất',
-    description: 'Giải pháp chuẩn cho nhà bán lẻ, đại lý phân phối và người làm dịch vụ cộng đồng.',
-    monthlyPrice: 99000,
-    yearlyPrice: 990000,
-    maxAccounts: 3,
-    maxGroups: 500,
-    maxScheduledTasks: 10,
-    dailyPostLimit: 200,
-  },
-  BUSINESS: {
-    name: 'Gói BUSINESS',
-    badge: 'Quy mô lớn',
-    description: 'Dành cho Agency, đội nhóm làm affiliate marketing và doanh nghiệp đa chi nhánh.',
-    monthlyPrice: 199000,
-    yearlyPrice: 1990000,
-    maxAccounts: 5,
-    maxGroups: 2000,
-    maxScheduledTasks: 30,
-    dailyPostLimit: 500,
-  },
-};
-
-export const INITIAL_ACCOUNTS: FacebookAccount[] = [
-  {
-    id: 'acc-1',
-    name: 'Nguyễn Minh Anh',
-    label: 'Hồ sơ chính (Bán Hàng)',
-    initials: 'NA',
-    avatarUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDcGmjMb7ET3VFZ3DxIEt6lmUkhSZ_vqckL4HXp1unA6yhTAlvax9jcXgd7oIeaf29uoW7QRZgNiGt4I_mRcgBmvd94GkhO7ugzY3FvACaU0BV_hSP7wMWKsn1y5FVShhYSA30pJ3_gvvA6QGGebzvnoRm-NzlQlLNDOhbESBHi7li05rpMkMSLpBDEfBzhO3ipZZVKRXLQxGX4Gk1xKA3FvoiS9kF-_yXLqSR7wY8',
-    uid: '100084920491823',
-    fanpageCount: 2,
-    status: 'CONNECTED',
-    statusLabel: 'Đã kết nối (Live)',
-    lastConnectedAgo: '10 phút trước',
-    lastConnectedAt: '14:22 - 24/10/2024',
-    cookieDaysLeft: 12,
-    verifiedOAuth: true,
+    userId: 'user-customer-pro',
+    email: 'customer@demo.fbpostpro.local',
+    label: 'Khách hàng (Gói Pro)',
+    role: 'CUSTOMER',
+    description: 'Tài khoản khách hàng có sẵn nhóm, Fanpage, tác vụ và thiết bị mẫu.',
   },
   {
-    id: 'acc-2',
-    name: 'Trần Long BĐS',
-    label: 'Profile Phụ - Đất Nền Miền Nam',
-    initials: 'TL',
-    avatarUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCCBXSr0OJw4BsYnzjpuVe1dS8yIFlA7TdhgYPh4_kPu20AknfQ41MKLbfxthmLWNbYFKEvZWRJFq1iX4Nbl_U_nQo7X0h7xDPPa9E4h_xRMhuX7vkzz0mPI7KRatYyMEZyQVH0MFedCdKisOmhCQyVBw9n_Ezzbl92hLuuxoyksosjr9vSJ3WTu67z7aqCOZFsTgUycqftu_Dw3H64pkPjthJb9mh3cGIbvbm5Ixo',
-    uid: '100092384719284',
-    fanpageCount: 1,
-    status: 'CONNECTED',
-    statusLabel: 'Đã kết nối',
-    lastConnectedAgo: '2 giờ trước',
-    lastConnectedAt: '12:15 - 24/10/2024',
-    cookieDaysLeft: 9,
-    verifiedOAuth: true,
+    userId: 'user-customer-expired',
+    email: 'expired@demo.fbpostpro.local',
+    label: 'Khách hàng (Gói hết hạn / Trống)',
+    role: 'CUSTOMER',
+    description: 'Tài khoản khách hàng có gói đã hết hạn và 0 dữ liệu để kiểm thử trạng thái rỗng.',
   },
   {
-    id: 'acc-3',
-    name: 'Hoàng Lan Chi',
-    label: 'Chưa xác minh token Meta',
-    initials: 'LC',
-    uid: '100078129034812',
-    fanpageCount: 0,
-    status: 'EXPIRED',
-    statusLabel: 'Cần xác thực lại',
-    lastConnectedAgo: '3 ngày trước',
-    lastConnectedAt: '09:40 - 21/10/2024',
-    isManual: true,
-    verifiedOAuth: false,
+    userId: 'user-admin',
+    email: 'admin@demo.fbpostpro.local',
+    label: 'Quản trị viên (Admin)',
+    role: 'ADMIN',
+    description: 'Tài khoản Admin quản trị người dùng, gói dịch vụ và xác nhận thanh toán DEMO.',
   },
 ];
 
-export const INITIAL_FANPAGES: Fanpage[] = [
-  {
-    id: 'fp-1',
-    name: 'Minh Anh Beauty Store',
-    pageId: '294819204918231',
-    initials: 'MA',
-    avatarUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCvBmjanzzvAupWLcpV8ZHtbd7K416flXdApkwdIwk02b4CFRFkWnZwugMU954ZgqTZs-Bmj1E9VJ_iHiQCubvlA2_xVTQUC7IaxlyTbt99KbWaue969CelyCcHVDpda4TKZZvTJX31ZhrGaYna0bxiH3CTmAldm0RGP2mY3__tKC8YQDbIOSmUYELm5EppJVZRl2a9aCKpXgznKC_y_NFVrrl3QX88y2BFR0Wl958',
-    ownerAccountId: 'acc-1',
-    ownerAccountName: 'Nguyễn Minh Anh',
-    canPublish: true,
-  },
-  {
-    id: 'fp-2',
-    name: 'Tổng Kho Sỉ Đầm Thiết Kế',
-    pageId: '884719284719382',
-    initials: 'TK',
-    avatarUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDngrKkMFDQC_wtn1SQfWm_NfcI5rI8UwQuFC8HS4rgKoXTBiHCw4QbqxvyuJo4rQ7w5LCDPOr2wRv70w5Zde43JuFsjC3o5AY3RpDjRd3j4SvdFx_likItxcqQQH2-h9ijL55hU2vZLsgVwCuF1lZEP-ossLOk0k9NE6tPtxVQcztDN7He2CFr-swhxrucJ8ec2YtUAEHD4MO9MiV4-gcc19xyOduQ0JWGLcHRNoA',
-    ownerAccountId: 'acc-1',
-    ownerAccountName: 'Nguyễn Minh Anh',
-    canPublish: true,
-  },
-  {
-    id: 'fp-3',
-    name: 'Bất Động Sản Ven Sông Đồng Nai',
-    pageId: '449281729384710',
-    initials: 'BS',
-    avatarUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuD8NoDmJUUrkbbZhROnDj-410TQ8Kf-eJoBUhRxZiQeMgozVdVtEjINy670lT__QqJgjVUjx7QUUsMVUFkHEHqBnUIVOJy1LhzBUlEb9FDlGaom-_qqKQYnChnb14auYgittKa3EVRhbCZh33EYycF-0-XE_99uCWKPAUZ4roGdJerOGjULr8K040ceIouyUn8BqlgJv5WTNE_F4PgNjJ3qAACzBwQC-7elTA27mFs',
-    ownerAccountId: 'acc-2',
-    ownerAccountName: 'Trần Long BĐS',
-    canPublish: true,
-  },
-  {
-    id: 'fp-4',
-    name: 'Cộng Đồng Nhà Đất Bình Dương',
-    pageId: '994829104928192',
-    initials: 'CS',
-    ownerAccountId: 'acc-2',
-    ownerAccountName: 'Trần Long BĐS',
-    canPublish: false,
-  },
-];
+function createInitialDraftSlots(userId: string, now: Date): Post[] {
+  const ts = now.toISOString();
+  const drafts: Post[] = [];
+  for (let slot = 1; slot <= 10; slot++) {
+    let content = '';
+    let linkUrl: string | null = null;
+    if (userId === 'user-customer-pro' && slot === 1) {
+      content =
+        'Chia sẻ checklist tối ưu nội dung bán hàng trên hội nhóm Facebook quý này:\n1. Tiêu đề rõ lợi ích trong 2 dòng đầu\n2. Đính kèm ảnh thực tế sắc nét\n3. Để lại thông tin liên hệ minh bạch ở cuối bài.';
+      linkUrl = 'https://example.com/checklist-noi-dung';
+    } else if (userId === 'user-customer-pro' && slot === 2) {
+      content =
+        'Tuyển cộng tác viên phân phối sản phẩm gia dụng thông minh khu vực TP.HCM & Hà Nội. Hỗ trợ hình ảnh và bài mẫu sẵn.';
+    }
 
-export const INITIAL_DEVICES: ExtensionDevice[] = [
-  {
-    id: 'dev-1',
-    name: 'Chrome trên Macbook Pro M2',
-    version: 'v1.2.4',
-    build: 'Build 2024.10',
-    icon: 'laptop_mac',
-    status: 'CONNECTED',
-    ip: '118.69.182.21',
-    browser: 'Chrome 130.0 macOS',
-    pingMs: 18,
-    lastActive: 'Vừa xong',
-  },
-  {
-    id: 'dev-2',
-    name: 'PC Văn Phòng Kho Tân Bình',
-    version: 'v1.2.4',
-    icon: 'desktop_windows',
-    status: 'CONNECTED',
-    ip: '14.161.42.90',
-    browser: 'Chrome 129.0 Windows 11',
-    pingMs: 24,
-    lastActive: '15 phút trước',
-  },
-];
-
-export const INITIAL_COLLECTIONS: GroupCollection[] = [
-  { id: 'col_bds', name: 'Bất động sản', colorDotClass: 'bg-primary' },
-  { id: 'col_tech', name: 'Công nghệ & Lập trình', colorDotClass: 'bg-emerald-500' },
-  { id: 'col_job', name: 'Tuyển dụng việc làm', colorDotClass: 'bg-amber-500' },
-  { id: 'col_general', name: 'Tổng hợp', colorDotClass: 'bg-secondary' },
-];
-
-export const INITIAL_GROUPS: FacebookGroup[] = [
-  {
-    id: 'grp-1',
-    name: 'Mua bán nhà đất Hà Nội',
-    initials: 'MB',
-    badgeColorClass: 'bg-primary-fixed text-primary',
-    uid: '1049285720194',
-    url: 'https://facebook.com/groups/muabannhadathanoi',
-    memberCount: 85420,
-    requiresApproval: 'false',
-    collectionId: 'col_bds',
-    selected: true,
-  },
-  {
-    id: 'grp-2',
-    name: 'Cộng đồng kinh doanh online',
-    initials: 'KD',
-    badgeColorClass: 'bg-secondary-fixed text-secondary',
-    uid: '8294018274019',
-    url: 'https://facebook.com/groups/kinhdoanhonlinevn',
-    memberCount: 142100,
-    requiresApproval: 'true',
-    collectionId: 'col_bds',
-    selected: true,
-  },
-  {
-    id: 'grp-3',
-    name: 'Chợ mua bán Việt Nam',
-    initials: 'VN',
-    badgeColorClass: 'bg-surface-container text-on-surface-variant',
-    uid: '5920194820194',
-    url: 'https://facebook.com/groups/chomuabanvietnam',
-    memberCount: 67890,
-    requiresApproval: 'false',
-    collectionId: 'col_bds',
-    selected: true,
-  },
-  {
-    id: 'grp-4',
-    name: 'Hội tuyển dụng Hà Nội',
-    initials: 'TD',
-    badgeColorClass: 'bg-tertiary-fixed text-tertiary',
-    uid: '3940182940182',
-    url: 'https://facebook.com/groups/hoituyendunghanoi',
-    memberCount: 53200,
-    requiresApproval: 'true',
-    collectionId: 'col_bds',
-    selected: true,
-  },
-  {
-    id: 'grp-5',
-    name: 'Cộng đồng doanh nghiệp',
-    initials: 'DN',
-    badgeColorClass: 'bg-surface-container text-on-surface-variant',
-    uid: '9182736451029',
-    url: 'https://facebook.com/groups/congdongdoanhnghiep',
-    memberCount: 31500,
-    requiresApproval: 'true',
-    collectionId: 'col_bds',
-    selected: false,
-  },
-  {
-    id: 'grp-6',
-    name: 'Hội Cư Dân The Matrix One Mễ Trì',
-    initials: 'MO',
-    badgeColorClass: 'bg-primary-fixed text-primary',
-    uid: '442019485720',
-    url: 'https://facebook.com/groups/matrixonemetri',
-    memberCount: 28900,
-    requiresApproval: 'false',
-    collectionId: 'col_bds',
-    selected: false,
-  },
-  {
-    id: 'grp-7',
-    name: 'Cộng Đồng Chung Cư Hà Nội Giá Tốt',
-    initials: 'CC',
-    badgeColorClass: 'bg-secondary-fixed text-secondary',
-    uid: '984572019412',
-    url: 'https://facebook.com/groups/chungcuhanoigiatot',
-    memberCount: 94300,
-    requiresApproval: 'false',
-    collectionId: 'col_bds',
-    selected: false,
-  },
-];
-
-export const INITIAL_SLOTS: PostSlot[] = Array.from({ length: 10 }, (_, idx) => {
-  const num = idx + 1;
-  if (num === 1) {
-    return {
-      slotNumber: 1,
-      title: 'BĐS Hà Nội Q3',
-      content:
-        'Cần cho thuê căn hộ 2 phòng ngủ tại Hà Nội. Căn hộ đầy đủ nội thất, không gian thoáng sáng, phù hợp gia đình hoặc người đi làm. Liên hệ để biết thêm thông tin và đặt lịch xem nhà trực tiếp trong tuần này.',
-      shareLink: 'https://batdongsan.com.vn/can-ho-cho-thue-ha-noi/p-109284',
-      media: [
-        {
-          id: 'm-1',
-          name: 'phong_khach.jpg',
-          sizeLabel: '2.4 MB',
-          type: 'image',
-          url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDbtx1oQkdxEUglQAL0Uiq0YydxcSEV5lEEOlhSOTu8m2RXVU9CA_3LpkbVaiQPCGSqItEsFHmBIZBYdjRQNUmSMTKseVd8wtkWS0i2QaNxHMXaAawFy3kFky-IPl2gqYLGWhi699dVuu_XW0LmuZNvydaoLzrWd1uWvkQgccCO5qQtfyPvt8kx4Oy-T4ePY8-LNBhHoMiMcVwekexm3IHE_n98K1iXUgxTpY1TKIs',
-          alt: 'Phòng khách căn hộ 2 phòng ngủ hiện đại tại Hà Nội',
-        },
-        {
-          id: 'm-2',
-          name: 'ban_cong.jpg',
-          sizeLabel: '1.8 MB',
-          type: 'image',
-          url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC1e_jYSZO-2dgbeQyunzB-RbEvfhOTjchiTDs80zR_NAH6aEYAurdftlfLef9NKHu8B-WARmQ2dlTwmQQUklDhk6faC2S0TLVN07JOL_h9CDwu0yf8CCJNigLXDsXc56s6DKJJp0tvtrSdmff5gz91QyK91Mq0YzAzcxLYg81crUD34nZK4aZi-EtwPuC8Qs-hl2QRtlSRrJuBtJUZjbfju_7SBSIbdYZe8Dn8nOA',
-          alt: 'Ban công nhiều cây xanh ngập tràn ánh sáng buổi sáng',
-        },
-      ],
-    };
-  }
-  if (num === 2) {
-    return {
-      slotNumber: 2,
-      title: 'Văn phòng Duy Tân',
-      content:
-        'Cho thuê văn phòng trọn gói phố Duy Tân, diện tích linh hoạt 45m2 - 120m2, full nội thất cao cấp chỉ từ 18$/m2. Miễn phí phòng họp, lễ tân và gửi xe máy cho nhân viên.',
-      shareLink: '',
+    drafts.push({
+      id: `draft-${userId}-${slot}`,
+      userId,
+      slotNumber: slot,
+      savedName: null,
+      content,
+      linkUrl,
+      status: 'DRAFT',
       media: [],
-    };
+      createdAt: ts,
+      updatedAt: ts,
+    });
   }
+  return drafts;
+}
+
+export function createSeedDemoDatabase(baseDate: Date = new Date()): DemoDatabase {
+  const nowIso = baseDate.toISOString();
+  const createdPast = addDaysIso(-45, baseDate);
+
+  const plans: Plan[] = [
+    {
+      id: 'plan-basic',
+      code: 'BASIC',
+      name: 'Gói Cơ Bản',
+      description: 'Phù hợp cho cá nhân bắt đầu quản lý nội dung và nhóm Facebook.',
+      priceMonthlyVnd: 199000,
+      priceYearlyVnd: 1990000,
+      maxFacebookAccounts: 2,
+      maxGroups: 50,
+      maxScheduledTasksPerDay: 15,
+      features: [
+        'Quản lý tối đa 2 hồ sơ Facebook',
+        'Lưu trữ đến 50 nhóm & bộ sưu tập nhóm',
+        'Tối đa 15 tác vụ lên lịch mỗi ngày',
+        'Hỗ trợ nhập/xuất danh sách nhóm bằng CSV',
+      ],
+      isActive: true,
+      createdAt: createdPast,
+      updatedAt: createdPast,
+    },
+    {
+      id: 'plan-pro',
+      code: 'PRO',
+      name: 'Gói Chuyên Nghiệp',
+      description: 'Dành cho đội ngũ bán hàng cần quản lý nhiều nhóm và Fanpage.',
+      priceMonthlyVnd: 499000,
+      priceYearlyVnd: 4990000,
+      maxFacebookAccounts: 10,
+      maxGroups: 500,
+      maxScheduledTasksPerDay: 100,
+      features: [
+        'Quản lý tối đa 10 hồ sơ Facebook & Fanpage',
+        'Lưu trữ đến 500 nhóm không giới hạn bộ sưu tập',
+        'Tối đa 100 tác vụ lên lịch mỗi ngày',
+        'Hỗ trợ đăng bài Fanpage & theo dõi xác nhận chi tiết',
+      ],
+      isActive: true,
+      createdAt: createdPast,
+      updatedAt: createdPast,
+    },
+    {
+      id: 'plan-agency',
+      code: 'AGENCY',
+      name: 'Gói Doanh Nghiệp',
+      description: 'Hạn mức mở rộng cho agency và hệ thống phân phối đa kênh.',
+      priceMonthlyVnd: 1290000,
+      priceYearlyVnd: 12900000,
+      maxFacebookAccounts: 30,
+      maxGroups: 2000,
+      maxScheduledTasksPerDay: 500,
+      features: [
+        'Quản lý tối đa 30 hồ sơ Facebook & Fanpage',
+        'Lưu trữ đến 2.000 nhóm Facebook',
+        'Tối đa 500 tác vụ lên lịch mỗi ngày',
+        'Ưu tiên hỗ trợ kỹ thuật & xuất báo cáo lịch sử',
+      ],
+      isActive: true,
+      createdAt: createdPast,
+      updatedAt: createdPast,
+    },
+  ];
+
+  const users: User[] = [
+    {
+      id: 'user-customer-pro',
+      email: 'customer@demo.fbpostpro.local',
+      fullName: 'Nguyễn Minh Quân',
+      avatarUrl: null,
+      role: 'CUSTOMER',
+      status: 'ACTIVE',
+      emailVerifiedAt: createdPast,
+      lastLoginAt: addMinutesIso(-15, baseDate),
+      createdAt: createdPast,
+      updatedAt: nowIso,
+    },
+    {
+      id: 'user-customer-expired',
+      email: 'expired@demo.fbpostpro.local',
+      fullName: 'Trần Thảo Vy',
+      avatarUrl: null,
+      role: 'CUSTOMER',
+      status: 'ACTIVE',
+      emailVerifiedAt: createdPast,
+      lastLoginAt: addDaysIso(-5, baseDate),
+      createdAt: createdPast,
+      updatedAt: addDaysIso(-5, baseDate),
+    },
+    {
+      id: 'user-admin',
+      email: 'admin@demo.fbpostpro.local',
+      fullName: 'Lê Hoàng Nam',
+      avatarUrl: null,
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      emailVerifiedAt: createdPast,
+      lastLoginAt: addMinutesIso(-5, baseDate),
+      createdAt: createdPast,
+      updatedAt: nowIso,
+    },
+  ];
+
+  const subscriptions: Subscription[] = [
+    {
+      id: 'sub-customer-pro',
+      userId: 'user-customer-pro',
+      planId: 'plan-pro',
+      billingPeriod: 'MONTHLY',
+      status: 'ACTIVE',
+      startsAt: addDaysIso(-12, baseDate),
+      endsAt: addDaysIso(18, baseDate),
+      createdAt: addDaysIso(-12, baseDate),
+      updatedAt: addDaysIso(-12, baseDate),
+    },
+    {
+      id: 'sub-customer-expired',
+      userId: 'user-customer-expired',
+      planId: 'plan-basic',
+      billingPeriod: 'MONTHLY',
+      status: 'EXPIRED',
+      startsAt: addDaysIso(-40, baseDate),
+      endsAt: addDaysIso(-10, baseDate),
+      createdAt: addDaysIso(-40, baseDate),
+      updatedAt: addDaysIso(-10, baseDate),
+    },
+    {
+      id: 'sub-admin',
+      userId: 'user-admin',
+      planId: 'plan-agency',
+      billingPeriod: 'YEARLY',
+      status: 'ACTIVE',
+      startsAt: addDaysIso(-30, baseDate),
+      endsAt: addDaysIso(335, baseDate),
+      createdAt: addDaysIso(-30, baseDate),
+      updatedAt: addDaysIso(-30, baseDate),
+    },
+  ];
+
+  const accounts: FacebookAccount[] = [
+    {
+      id: 'fb-acc-1',
+      userId: 'user-customer-pro',
+      facebookUid: '100084920193841',
+      displayName: 'Minh Quân — Kinh doanh',
+      avatarUrl: null,
+      connectionType: 'META_OAUTH',
+      status: 'CONNECTED',
+      lastConnectedAt: addMinutesIso(-20, baseDate),
+      createdAt: addDaysIso(-30, baseDate),
+      updatedAt: addMinutesIso(-20, baseDate),
+    },
+    {
+      id: 'fb-acc-2',
+      userId: 'user-customer-pro',
+      facebookUid: null,
+      displayName: 'Hồ sơ Thủ công — Nhóm BĐS',
+      avatarUrl: null,
+      connectionType: 'MANUAL_PROFILE',
+      status: 'UNVERIFIED',
+      lastConnectedAt: null,
+      createdAt: addDaysIso(-10, baseDate),
+      updatedAt: addDaysIso(-10, baseDate),
+    },
+    {
+      id: 'fb-acc-admin-1',
+      userId: 'user-admin',
+      facebookUid: '100099112233445',
+      displayName: 'Admin Demo Profile',
+      avatarUrl: null,
+      connectionType: 'META_OAUTH',
+      status: 'CONNECTED',
+      lastConnectedAt: addMinutesIso(-10, baseDate),
+      createdAt: addDaysIso(-20, baseDate),
+      updatedAt: addMinutesIso(-10, baseDate),
+    },
+  ];
+
+  const pages: FacebookPage[] = [
+    {
+      id: 'fb-page-1',
+      userId: 'user-customer-pro',
+      facebookAccountId: 'fb-acc-1',
+      pageUid: '105829301928374',
+      pageName: 'Gia Dụng Thông Minh Minh Quân',
+      avatarUrl: null,
+      pageUrl: 'https://www.facebook.com/giadungminhquan',
+      canPublish: true,
+      createdAt: addDaysIso(-29, baseDate),
+      updatedAt: addMinutesIso(-20, baseDate),
+    },
+    {
+      id: 'fb-page-2',
+      userId: 'user-customer-pro',
+      facebookAccountId: 'fb-acc-1',
+      pageUid: '105829301999112',
+      pageName: 'Kho Hàng Sỉ Miền Nam (Chỉ xem)',
+      avatarUrl: null,
+      pageUrl: 'https://www.facebook.com/khohangsimiennam',
+      canPublish: false,
+      createdAt: addDaysIso(-29, baseDate),
+      updatedAt: addMinutesIso(-20, baseDate),
+    },
+  ];
+
+  const groups: FacebookGroup[] = [
+    {
+      id: 'grp-1',
+      userId: 'user-customer-pro',
+      groupUid: '384920192837465',
+      groupName: 'Cộng Đồng Bán Hàng Online TP.HCM',
+      groupUrl: 'https://www.facebook.com/groups/384920192837465',
+      avatarUrl: null,
+      memberCount: 48200,
+      requiresApproval: false,
+      notes: 'Tương tác tốt khung giờ 19h–21h',
+      createdAt: addDaysIso(-25, baseDate),
+      updatedAt: addDaysIso(-5, baseDate),
+    },
+    {
+      id: 'grp-2',
+      userId: 'user-customer-pro',
+      groupUid: null,
+      groupName: 'Hội Gia Dụng & Mẹ Bé Hà Nội',
+      groupUrl: 'https://www.facebook.com/groups/giadungmebehanoi',
+      avatarUrl: null,
+      memberCount: 23500,
+      requiresApproval: true,
+      notes: 'Cần quản trị viên duyệt bài trước khi hiển thị',
+      createdAt: addDaysIso(-20, baseDate),
+      updatedAt: addDaysIso(-4, baseDate),
+    },
+    {
+      id: 'grp-3',
+      userId: 'user-customer-pro',
+      groupUid: '892019283746123',
+      groupName: 'Chợ Sỉ Toàn Quốc — Nguồn Hàng Trực Tiếp',
+      groupUrl: 'https://www.facebook.com/groups/892019283746123',
+      avatarUrl: null,
+      memberCount: 91400,
+      requiresApproval: false,
+      notes: null,
+      createdAt: addDaysIso(-18, baseDate),
+      updatedAt: addDaysIso(-3, baseDate),
+    },
+    {
+      id: 'grp-4',
+      userId: 'user-customer-pro',
+      groupUid: null,
+      groupName: 'Hội Chủ Shop Shopee & TikTok Việt Nam',
+      groupUrl: 'https://www.facebook.com/groups/chushopvietnam',
+      avatarUrl: null,
+      memberCount: null,
+      requiresApproval: null,
+      notes: 'Chưa xác định quy định duyệt bài',
+      createdAt: addDaysIso(-12, baseDate),
+      updatedAt: addDaysIso(-2, baseDate),
+    },
+    {
+      id: 'grp-5',
+      userId: 'user-customer-pro',
+      groupUid: '512908374615293',
+      groupName: 'Review Đồ Gia Dụng Thực Tế',
+      groupUrl: 'https://www.facebook.com/groups/512908374615293',
+      avatarUrl: null,
+      memberCount: 15800,
+      requiresApproval: true,
+      notes: 'Ưu tiên bài chia sẻ trải nghiệm, hạn chế link trực tiếp',
+      createdAt: addDaysIso(-8, baseDate),
+      updatedAt: addDaysIso(-1, baseDate),
+    },
+  ];
+
+  const collections: GroupCollection[] = [
+    {
+      id: 'col-1',
+      userId: 'user-customer-pro',
+      name: 'Nhóm Gia Dụng Chủ Lực',
+      createdAt: addDaysIso(-15, baseDate),
+      updatedAt: addDaysIso(-2, baseDate),
+    },
+    {
+      id: 'col-2',
+      userId: 'user-customer-pro',
+      name: 'Nhóm Không Cần Duyệt Bài',
+      createdAt: addDaysIso(-10, baseDate),
+      updatedAt: addDaysIso(-2, baseDate),
+    },
+  ];
+
+  // Many-to-many: grp-1 belongs to BOTH col-1 and col-2
+  const collectionItems: GroupCollectionItem[] = [
+    { collectionId: 'col-1', groupId: 'grp-1', createdAt: addDaysIso(-15, baseDate) },
+    { collectionId: 'col-1', groupId: 'grp-2', createdAt: addDaysIso(-15, baseDate) },
+    { collectionId: 'col-1', groupId: 'grp-5', createdAt: addDaysIso(-8, baseDate) },
+    { collectionId: 'col-2', groupId: 'grp-1', createdAt: addDaysIso(-10, baseDate) },
+    { collectionId: 'col-2', groupId: 'grp-3', createdAt: addDaysIso(-10, baseDate) },
+  ];
+
+  const posts: Post[] = [
+    ...createInitialDraftSlots('user-customer-pro', baseDate),
+    ...createInitialDraftSlots('user-customer-expired', baseDate),
+    ...createInitialDraftSlots('user-admin', baseDate),
+    {
+      id: 'saved-post-1',
+      userId: 'user-customer-pro',
+      slotNumber: null,
+      savedName: 'Mẫu giới thiệu combo gia dụng tháng này',
+      content:
+        'Combo 3 sản phẩm nhà bếp tối giản — bảo hành chính hãng 12 tháng, kiểm tra hàng trước khi thanh toán. Inbox để nhận bảng giá sỉ & lẻ.',
+      linkUrl: 'https://example.com/combo-gia-dung',
+      status: 'SAVED',
+      media: [],
+      createdAt: addDaysIso(-9, baseDate),
+      updatedAt: addDaysIso(-3, baseDate),
+    },
+    {
+      id: 'saved-post-2',
+      userId: 'user-customer-pro',
+      slotNumber: null,
+      savedName: 'Mẫu tuyển đại lý phân phối',
+      content:
+        'Tìm đối tác đại lý khu vực miền Nam & miền Trung. Chiết khấu minh bạch, cung cấp đầy đủ tài liệu sản phẩm và hình ảnh chụp thực tế.',
+      linkUrl: null,
+      status: 'SAVED',
+      media: [],
+      createdAt: addDaysIso(-6, baseDate),
+      updatedAt: addDaysIso(-1, baseDate),
+    },
+  ];
+
+  // Task 1: WAITING_CONFIRMATION (Manual group posting — 1 SUCCESS, 1 WAITING_CONFIRMATION)
+  const task1Items: PublishingTask['items'] = [
+    {
+      id: 'ti-101',
+      taskId: 'task-101',
+      sourcePostId: 'draft-user-customer-pro-1',
+      groupId: 'grp-1',
+      pageId: null,
+      contentSnapshot:
+        'Chia sẻ checklist tối ưu nội dung bán hàng trên hội nhóm Facebook quý này:\n1. Tiêu đề rõ lợi ích trong 2 dòng đầu\n2. Đính kèm ảnh thực tế sắc nét',
+      linkSnapshot: 'https://example.com/checklist-noi-dung',
+      destinationNameSnapshot: 'Cộng Đồng Bán Hàng Online TP.HCM',
+      destinationUrlSnapshot: 'https://www.facebook.com/groups/384920192837465',
+      mediaSnapshots: [],
+      status: 'SUCCESS',
+      confirmationType: 'USER',
+      resultPostUrl: 'https://www.facebook.com/groups/384920192837465/posts/9988776655',
+      externalPostId: null,
+      errorCode: null,
+      errorMessage: null,
+      attemptCount: 1,
+      startedAt: addMinutesIso(-45, baseDate),
+      finishedAt: addMinutesIso(-40, baseDate),
+      createdAt: addMinutesIso(-50, baseDate),
+      updatedAt: addMinutesIso(-40, baseDate),
+    },
+    {
+      id: 'ti-102',
+      taskId: 'task-101',
+      sourcePostId: 'draft-user-customer-pro-1',
+      groupId: 'grp-2',
+      pageId: null,
+      contentSnapshot:
+        'Chia sẻ checklist tối ưu nội dung bán hàng trên hội nhóm Facebook quý này:\n1. Tiêu đề rõ lợi ích trong 2 dòng đầu\n2. Đính kèm ảnh thực tế sắc nét',
+      linkSnapshot: 'https://example.com/checklist-noi-dung',
+      destinationNameSnapshot: 'Hội Gia Dụng & Mẹ Bé Hà Nội',
+      destinationUrlSnapshot: 'https://www.facebook.com/groups/giadungmebehanoi',
+      mediaSnapshots: [],
+      status: 'WAITING_CONFIRMATION',
+      confirmationType: null,
+      resultPostUrl: null,
+      externalPostId: null,
+      errorCode: null,
+      errorMessage: null,
+      attemptCount: 1,
+      startedAt: addMinutesIso(-38, baseDate),
+      finishedAt: null,
+      createdAt: addMinutesIso(-50, baseDate),
+      updatedAt: addMinutesIso(-38, baseDate),
+    },
+  ];
+
+  // Task 2: SCHEDULED (Future timestamp in current month/year)
+  const scheduledFutureIso = addMinutesIso(180, baseDate);
+  const task2Items: PublishingTask['items'] = [
+    {
+      id: 'ti-201',
+      taskId: 'task-201',
+      sourcePostId: 'draft-user-customer-pro-2',
+      groupId: 'grp-3',
+      pageId: null,
+      contentSnapshot:
+        'Tuyển cộng tác viên phân phối sản phẩm gia dụng thông minh khu vực TP.HCM & Hà Nội.',
+      linkSnapshot: null,
+      destinationNameSnapshot: 'Chợ Sỉ Toàn Quốc — Nguồn Hàng Trực Tiếp',
+      destinationUrlSnapshot: 'https://www.facebook.com/groups/892019283746123',
+      mediaSnapshots: [],
+      status: 'PENDING',
+      confirmationType: null,
+      resultPostUrl: null,
+      externalPostId: null,
+      errorCode: null,
+      errorMessage: null,
+      attemptCount: 0,
+      startedAt: null,
+      finishedAt: null,
+      createdAt: addMinutesIso(-120, baseDate),
+      updatedAt: addMinutesIso(-120, baseDate),
+    },
+    {
+      id: 'ti-202',
+      taskId: 'task-201',
+      sourcePostId: 'draft-user-customer-pro-2',
+      groupId: 'grp-5',
+      pageId: null,
+      contentSnapshot:
+        'Tuyển cộng tác viên phân phối sản phẩm gia dụng thông minh khu vực TP.HCM & Hà Nội.',
+      linkSnapshot: null,
+      destinationNameSnapshot: 'Review Đồ Gia Dụng Thực Tế',
+      destinationUrlSnapshot: 'https://www.facebook.com/groups/512908374615293',
+      mediaSnapshots: [],
+      status: 'PENDING',
+      confirmationType: null,
+      resultPostUrl: null,
+      externalPostId: null,
+      errorCode: null,
+      errorMessage: null,
+      attemptCount: 0,
+      startedAt: null,
+      finishedAt: null,
+      createdAt: addMinutesIso(-120, baseDate),
+      updatedAt: addMinutesIso(-120, baseDate),
+    },
+  ];
+
+  // Task 3: PARTIAL_FAILED (1 SUCCESS + 1 FAILED eligible for retry)
+  const task3Items: PublishingTask['items'] = [
+    {
+      id: 'ti-301',
+      taskId: 'task-301',
+      sourcePostId: 'saved-post-1',
+      groupId: null,
+      pageId: 'fb-page-1',
+      contentSnapshot: 'Combo 3 sản phẩm nhà bếp tối giản — bảo hành chính hãng 12 tháng.',
+      linkSnapshot: 'https://example.com/combo-gia-dung',
+      destinationNameSnapshot: 'Gia Dụng Thông Minh Minh Quân',
+      destinationUrlSnapshot: 'https://www.facebook.com/giadungminhquan',
+      mediaSnapshots: [],
+      status: 'SUCCESS',
+      confirmationType: 'API',
+      resultPostUrl: 'https://www.facebook.com/giadungminhquan/posts/1029384756',
+      externalPostId: '105829301928374_1029384756',
+      errorCode: null,
+      errorMessage: null,
+      attemptCount: 1,
+      startedAt: addDaysIso(-1, baseDate),
+      finishedAt: addDaysIso(-1, baseDate),
+      createdAt: addDaysIso(-1, baseDate),
+      updatedAt: addDaysIso(-1, baseDate),
+    },
+    {
+      id: 'ti-302',
+      taskId: 'task-301',
+      sourcePostId: 'saved-post-2',
+      groupId: 'grp-4',
+      pageId: null,
+      contentSnapshot: 'Tìm đối tác đại lý khu vực miền Nam & miền Trung.',
+      linkSnapshot: null,
+      destinationNameSnapshot: 'Hội Chủ Shop Shopee & TikTok Việt Nam',
+      destinationUrlSnapshot: 'https://www.facebook.com/groups/chushopvietnam',
+      mediaSnapshots: [],
+      status: 'FAILED',
+      confirmationType: 'USER',
+      resultPostUrl: null,
+      externalPostId: null,
+      errorCode: 'GROUP_POSTING_RESTRICTED',
+      errorMessage: 'Nhóm tạm thời giới hạn đăng bài từ tài khoản chưa đủ 30 ngày tham gia.',
+      attemptCount: 1,
+      startedAt: addDaysIso(-1, baseDate),
+      finishedAt: addDaysIso(-1, baseDate),
+      createdAt: addDaysIso(-1, baseDate),
+      updatedAt: addDaysIso(-1, baseDate),
+    },
+  ];
+
+  // Task 4: COMPLETED (2 days ago)
+  const task4Items: PublishingTask['items'] = [
+    {
+      id: 'ti-401',
+      taskId: 'task-401',
+      sourcePostId: 'saved-post-1',
+      groupId: null,
+      pageId: 'fb-page-1',
+      contentSnapshot: 'Thông báo lịch giao hàng cuối tuần & ưu đãi vận chuyển nội thành.',
+      linkSnapshot: null,
+      destinationNameSnapshot: 'Gia Dụng Thông Minh Minh Quân',
+      destinationUrlSnapshot: 'https://www.facebook.com/giadungminhquan',
+      mediaSnapshots: [],
+      status: 'SUCCESS',
+      confirmationType: 'API',
+      resultPostUrl: 'https://www.facebook.com/giadungminhquan/posts/1029300011',
+      externalPostId: '105829301928374_1029300011',
+      errorCode: null,
+      errorMessage: null,
+      attemptCount: 1,
+      startedAt: addDaysIso(-2, baseDate),
+      finishedAt: addDaysIso(-2, baseDate),
+      createdAt: addDaysIso(-2, baseDate),
+      updatedAt: addDaysIso(-2, baseDate),
+    },
+  ];
+
+  // Task 5: SCHEDULED next day for calendar visibility
+  const scheduledTomorrowIso = addDaysIso(1, baseDate);
+  const task5Items: PublishingTask['items'] = [
+    {
+      id: 'ti-501',
+      taskId: 'task-501',
+      sourcePostId: 'saved-post-1',
+      groupId: null,
+      pageId: 'fb-page-1',
+      contentSnapshot: 'Cập nhật bảng giá sản phẩm mới nhất tuần này trên Fanpage chính thức.',
+      linkSnapshot: 'https://example.com/bang-gia',
+      destinationNameSnapshot: 'Gia Dụng Thông Minh Minh Quân',
+      destinationUrlSnapshot: 'https://www.facebook.com/giadungminhquan',
+      mediaSnapshots: [],
+      status: 'PENDING',
+      confirmationType: null,
+      resultPostUrl: null,
+      externalPostId: null,
+      errorCode: null,
+      errorMessage: null,
+      attemptCount: 0,
+      startedAt: null,
+      finishedAt: null,
+      createdAt: addMinutesIso(-30, baseDate),
+      updatedAt: addMinutesIso(-30, baseDate),
+    },
+  ];
+
+  const tasks: PublishingTask[] = [
+    {
+      id: 'task-101',
+      userId: 'user-customer-pro',
+      facebookAccountId: 'fb-acc-1',
+      targetType: 'GROUP',
+      executionMode: 'MANUAL_GROUP',
+      scheduledAt: null,
+      status: deriveTaskStatus(task1Items),
+      idempotencyKey: 'seed-task-101',
+      startedAt: addMinutesIso(-45, baseDate),
+      finishedAt: null,
+      createdAt: addMinutesIso(-50, baseDate),
+      updatedAt: addMinutesIso(-38, baseDate),
+      items: task1Items,
+    },
+    {
+      id: 'task-201',
+      userId: 'user-customer-pro',
+      facebookAccountId: 'fb-acc-2',
+      targetType: 'GROUP',
+      executionMode: 'MANUAL_GROUP',
+      scheduledAt: scheduledFutureIso,
+      status: deriveTaskStatus(task2Items, { isScheduledFuture: true }),
+      idempotencyKey: 'seed-task-201',
+      startedAt: null,
+      finishedAt: null,
+      createdAt: addMinutesIso(-120, baseDate),
+      updatedAt: addMinutesIso(-120, baseDate),
+      items: task2Items,
+    },
+    {
+      id: 'task-301',
+      userId: 'user-customer-pro',
+      facebookAccountId: 'fb-acc-1',
+      targetType: 'GROUP',
+      executionMode: 'MANUAL_GROUP',
+      scheduledAt: null,
+      status: deriveTaskStatus(task3Items),
+      idempotencyKey: 'seed-task-301',
+      startedAt: addDaysIso(-1, baseDate),
+      finishedAt: addDaysIso(-1, baseDate),
+      createdAt: addDaysIso(-1, baseDate),
+      updatedAt: addDaysIso(-1, baseDate),
+      items: task3Items,
+    },
+    {
+      id: 'task-401',
+      userId: 'user-customer-pro',
+      facebookAccountId: 'fb-acc-1',
+      targetType: 'PAGE',
+      executionMode: 'META_PAGE_API',
+      scheduledAt: null,
+      status: deriveTaskStatus(task4Items),
+      idempotencyKey: 'seed-task-401',
+      startedAt: addDaysIso(-2, baseDate),
+      finishedAt: addDaysIso(-2, baseDate),
+      createdAt: addDaysIso(-2, baseDate),
+      updatedAt: addDaysIso(-2, baseDate),
+      items: task4Items,
+    },
+    {
+      id: 'task-501',
+      userId: 'user-customer-pro',
+      facebookAccountId: 'fb-acc-1',
+      targetType: 'PAGE',
+      executionMode: 'META_PAGE_API',
+      scheduledAt: scheduledTomorrowIso,
+      status: deriveTaskStatus(task5Items, { isScheduledFuture: true }),
+      idempotencyKey: 'seed-task-501',
+      startedAt: null,
+      finishedAt: null,
+      createdAt: addMinutesIso(-30, baseDate),
+      updatedAt: addMinutesIso(-30, baseDate),
+      items: task5Items,
+    },
+  ];
+
+  const devices: ExtensionDevice[] = [
+    {
+      id: 'dev-1',
+      userId: 'user-customer-pro',
+      deviceName: 'Chrome — Máy tính văn phòng (Windows)',
+      extensionVersion: '1.0.0-preview',
+      lastSeenAt: addMinutesIso(-1, baseDate),
+      revokedAt: null,
+      createdAt: addDaysIso(-14, baseDate),
+    },
+    {
+      id: 'dev-2',
+      userId: 'user-customer-pro',
+      deviceName: 'Chrome — Laptop cá nhân (macOS)',
+      extensionVersion: '1.0.0-preview',
+      lastSeenAt: addDaysIso(-3, baseDate),
+      revokedAt: null,
+      createdAt: addDaysIso(-20, baseDate),
+    },
+  ];
+
+  const orders: PaymentOrder[] = [
+    {
+      id: 'ord-paid-1',
+      userId: 'user-customer-pro',
+      planId: 'plan-pro',
+      orderCode: 'FPP-DEMO-202601',
+      amountVnd: 499000,
+      billingPeriod: 'MONTHLY',
+      paymentMethod: 'VIETQR',
+      providerReference: 'DEMO-TXN-88412',
+      status: 'PAID',
+      paidAt: addDaysIso(-12, baseDate),
+      expiresAt: addDaysIso(-12, baseDate),
+      createdAt: addDaysIso(-12, baseDate),
+      updatedAt: addDaysIso(-12, baseDate),
+    },
+    {
+      id: 'ord-pending-1',
+      userId: 'user-customer-pro',
+      planId: 'plan-agency',
+      orderCode: 'FPP-DEMO-202602',
+      amountVnd: 1290000,
+      billingPeriod: 'MONTHLY',
+      paymentMethod: 'VIETQR',
+      providerReference: null,
+      status: 'PENDING',
+      paidAt: null,
+      expiresAt: addMinutesIso(15, baseDate),
+      createdAt: addMinutesIso(-2, baseDate),
+      updatedAt: addMinutesIso(-2, baseDate),
+    },
+  ];
+
+  const auditLogs: AuditLog[] = [
+    {
+      id: 'audit-1',
+      actorUserId: 'user-admin',
+      action: 'ORDER_CONFIRMED_DEMO',
+      entityType: 'payment_orders',
+      entityId: 'ord-paid-1',
+      metadata: { orderCode: 'FPP-DEMO-202601', amountVnd: 499000 },
+      createdAt: addDaysIso(-12, baseDate),
+    },
+  ];
+
   return {
-    slotNumber: num,
-    title: `Kịch bản #${num}`,
-    content: '',
-    shareLink: '',
-    media: [],
+    users,
+    plans,
+    subscriptions,
+    accounts,
+    pages,
+    groups,
+    collections,
+    collectionItems,
+    posts,
+    tasks,
+    devices,
+    orders,
+    auditLogs,
   };
-});
-
-export const INITIAL_SAVED_POSTS: SavedPost[] = [
-  {
-    id: 'sp-1',
-    title: 'Cho thuê căn hộ 2PN Cầu Giấy - Nội thất châu Âu',
-    content:
-      'Cần cho thuê căn hộ 2 phòng ngủ tại Hà Nội. Căn hộ đầy đủ nội thất, không gian thoáng sáng, phù hợp gia đình hoặc người đi làm. Liên hệ để biết thêm thông tin và đặt lịch xem nhà trực tiếp trong tuần này.',
-    shareLink: 'https://batdongsan.com.vn/can-ho-cho-thue-ha-noi/p-109284',
-    mediaCount: 2,
-    updatedAt: 'Hôm nay, 09:30',
-  },
-  {
-    id: 'sp-2',
-    title: 'Shophouse khối đế Hà Nội Garden City - CK 12%',
-    content:
-      '🔥 [MỞ BÁN ĐỘC QUYỀN] Shophouse khối đế chung cư Hà Nội Garden City\n📍 Vị trí kim cương ngay trung tâm khu đô thị sinh thái.\n✨ Chiết khấu lên tới 12% khi thanh toán sớm trong quý 4.\n📞 Hotline tư vấn quỹ căn ngoại giao: 0988.xxx.xxx',
-    shareLink: '',
-    mediaCount: 4,
-    updatedAt: '23/10/2024',
-  },
-  {
-    id: 'sp-3',
-    title: 'Bán gấp nhà mặt phố Hoàng Quốc Việt - 6 tầng thang máy',
-    content:
-      'Bán gấp nhà mặt phố Hoàng Quốc Việt, 6 tầng thang máy kinh doanh đỉnh cao, vỉa hè rộng 5m đá bóng, sổ đỏ chính chủ nở hậu, giá đầu tư cực tốt cho khách thiện chí.',
-    shareLink: 'https://nhaphohanoi.vn/hoang-quoc-viet',
-    mediaCount: 0,
-    updatedAt: '20/10/2024',
-  },
-];
-
-export const INITIAL_TASKS: PublishingTask[] = [
-  {
-    id: 'TASK-89201',
-    status: 'RUNNING',
-    slotNumber: 1,
-    mediaType: 'images',
-    mediaSummary: '(4 ảnh)',
-    content:
-      '🔥 [MỞ BÁN ĐỘC QUYỀN] Shophouse khối đế chung cư Hà Nội Garden City\n📍 Vị trí kim cương ngay trung tâm khu đô thị sinh thái.\n✨ Chiết khấu lên tới 12% khi thanh toán sớm trong quý 4.\n📞 Hotline tư vấn quỹ căn ngoại giao: 0988.xxx.xxx',
-    accountId: 'acc-1',
-    accountName: 'Nguyễn Minh Anh',
-    accountInitials: 'NA',
-    accountRoleLabel: 'Profile Bán Hàng',
-    destinationSummary: '4 nhóm Manual',
-    destinationDetail: 'BĐS Cầu Giấy, Chung cư HN, Đầu tư 24h',
-    method: 'MANUAL_GROUP',
-    completedCount: 2,
-    totalCount: 4,
-    scheduledLabel: '14:15 - Hôm nay',
-    subTimeLabel: 'Khởi chạy 5p trước',
-    calendarDay: 24,
-    mediaUrls: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDE7Qd3D4e8sqrtjXnrkF4l_jpJLEBDxtAP9FG66TOO0CNDykrnmhbNiR6-MlyeZAxgzLlX2-gs8q14l-X1JtK7IBo68eXWcDh9rF0NnPwv8vhO3QjSJnjBSKF1yYlYstvcOX4ZbYrG4pMKEp51uoJ9-gAp3jyiwwDlA-Po7-ZCuvG7LSguNcNhKJaNTeaC9_TnrA4wYe3A-WDlC54J8lnUM2kyml4jiDmDlMRwml8',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCHKTIrIXSnXcjf9pY_gvJlCBTI-htmEDrDPm4dpmI90KPOUWWmWEpEVDnvrR01udRh4xE08RNYAuFgGPtHAvMyK3WyBHLcLLisF6xNEl-30NlNAvjXIhJC2YFMpKj8UkSU2GYpgBZZugr4dyqYBptvah5RuyYC4kvTeyWxYXyrQ3O3xJUSko8Xh_fZMPbJyUgVO42IANiPkn1EoFqgBMFBgzyD-NWkeGbvTC5Vh_E',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBMvUrYwQTwei-HpkyCZAlJ2XiPREMkKQsD4hgNGquVnJv9dNHyeeBiEoOYEpioRZaY-QAYMBX7pxpdkLt2x3acDEsjxcf6EJbam5N6-MM4PJBre-V3ENYSHE89mUHFnd0QHZTv6246InZ7Z9GXjoQR7e5T7A5kdgIR685E1ZzCQwcSGxmlyUqyKrD5hm24bJX1zNAbgkHUQjuY30wpDAUSMd8NR_Np-iz_W4iJrUk',
-    ],
-    items: [
-      {
-        id: 'ti-1',
-        groupName: 'Hội Cư Dân BĐS Cầu Giấy (128k mem)',
-        groupUid: '1049285720194',
-        memberCountLabel: '128k mem',
-        status: 'SUCCESS',
-        statusDetail: 'Thành công • Đã xác nhận bài live lúc 14:16',
-        timestamp: '14:16',
-        permalink: 'https://facebook.com/groups/bds.caugiay/posts/98129841',
-      },
-      {
-        id: 'ti-2',
-        groupName: 'Cộng Đồng Chung Cư Hà Nội VIP (85k mem)',
-        groupUid: '8294018274019',
-        memberCountLabel: '85k mem',
-        status: 'SUCCESS',
-        statusDetail: 'Thành công • Đã xác nhận bài live lúc 14:18',
-        timestamp: '14:18',
-        permalink: 'https://facebook.com/groups/chungcuhn.vip/posts/98129910',
-      },
-      {
-        id: 'ti-3',
-        groupName: 'Đầu Tư BĐS Miền Bắc 24h (44k mem)',
-        groupUid: '5920194820194',
-        memberCountLabel: '44k mem',
-        status: 'RUNNING',
-        statusDetail: 'Đang upload ảnh và nhập nội dung qua Extension...',
-        timestamp: '14:20',
-      },
-      {
-        id: 'ti-4',
-        groupName: 'Mua Bán Nhà Đất Tây Hồ - Ba Đình (62k mem)',
-        groupUid: '3940182940182',
-        memberCountLabel: '62k mem',
-        status: 'QUEUED',
-        statusDetail: 'Chờ giãn cách an toàn (dự kiến 14:23)',
-        timestamp: '14:23',
-      },
-    ],
-    logs: [
-      {
-        time: '14:15:20',
-        tag: '[AUTH]',
-        message: 'Verified active session for FB profile: Nguyễn Minh Anh (ID: 100084729182)',
-        tone: 'success',
-      },
-      {
-        time: '14:15:35',
-        tag: '[EXT]',
-        message: 'Navigating to group /groups/bds.caugiay/buy_sell_post',
-        tone: 'info',
-      },
-      {
-        time: '14:16:10',
-        tag: '[EXT]',
-        message: 'Post created successfully. Permalink: facebook.com/groups/bds.caugiay/posts/98129841',
-        tone: 'success',
-      },
-      {
-        time: '14:16:45',
-        tag: '[THROTTLE]',
-        message: 'Waiting random jitter delay: 62.4 seconds to mimic human interaction...',
-        tone: 'info',
-      },
-      {
-        time: '14:18:02',
-        tag: '[EXT]',
-        message: 'Post created successfully on /groups/chungcuhn.vip',
-        tone: 'success',
-      },
-      {
-        time: '14:18:40',
-        tag: '[EXT]',
-        message: 'Simulating typing & clipboard paste into group /groups/dautu24h...',
-        tone: 'warn',
-      },
-    ],
-  },
-  {
-    id: 'TASK-89198',
-    status: 'WAITING_CONFIRMATION',
-    slotNumber: 2,
-    mediaType: 'image',
-    mediaSummary: '(1 ảnh)',
-    content:
-      'Cho thuê văn phòng trọn gói phố Duy Tân, diện tích linh hoạt 45m2 - 120m2, full nội thất cao cấp chỉ từ 18$/m2...',
-    accountId: 'acc-2',
-    accountName: 'Trần Long BĐS',
-    accountInitials: 'TL',
-    accountRoleLabel: 'Profile Phụ',
-    destinationSummary: '3 nhóm Facebook',
-    destinationDetail: 'Hội Mặt Bằng Cầu Giấy, Văn Phòng HN',
-    method: 'MANUAL_GROUP',
-    completedCount: 2,
-    totalCount: 3,
-    scheduledLabel: '13:50 - Hôm nay',
-    subTimeLabel: 'Chờ duyệt bài nhóm',
-    calendarDay: 24,
-    mediaUrls: [],
-    items: [
-      {
-        id: 'ti-21',
-        groupName: 'Hội Mặt Bằng Cầu Giấy',
-        groupUid: '2249285720194',
-        memberCountLabel: '64k mem',
-        status: 'SUCCESS',
-        statusDetail: 'Đã đăng thành công lúc 13:52',
-        timestamp: '13:52',
-      },
-      {
-        id: 'ti-22',
-        groupName: 'Văn Phòng Cho Thuê Hà Nội',
-        groupUid: '3349285720194',
-        memberCountLabel: '91k mem',
-        status: 'SUCCESS',
-        statusDetail: 'Đã đăng thành công lúc 13:54',
-        timestamp: '13:54',
-      },
-      {
-        id: 'ti-23',
-        groupName: 'Cộng Đồng Startup & Office HN',
-        groupUid: '4449285720194',
-        memberCountLabel: '38k mem',
-        status: 'WAITING_CONFIRMATION',
-        statusDetail: 'Bài đăng đang ở trạng thái Chờ Quản trị viên nhóm duyệt',
-        timestamp: '13:56',
-      },
-    ],
-    logs: [
-      {
-        time: '13:50:12',
-        tag: '[AUTH]',
-        message: 'Verified active session for Trần Long BĐS',
-        tone: 'success',
-      },
-      {
-        time: '13:56:04',
-        tag: '[WAIT]',
-        message: 'Group requires admin approval. Waiting confirmation...',
-        tone: 'warn',
-      },
-    ],
-  },
-  {
-    id: 'TASK-89195',
-    status: 'SCHEDULED',
-    slotNumber: 1,
-    mediaType: 'video',
-    mediaSummary: '(1 video)',
-    content:
-      'Review thực tế căn hộ mẫu 3 phòng ngủ The Matrix One Mễ Trì, tầm nhìn công viên hồ điều hòa 14ha siêu thoáng đãng...',
-    accountId: 'acc-1',
-    accountName: 'Nguyễn Minh Anh',
-    accountInitials: 'NA',
-    accountRoleLabel: 'Profile Bán Hàng',
-    destinationSummary: '5 nhóm Manual',
-    destinationDetail: 'Hội Cư Dân The Matrix One, BĐS Tây Mỗ',
-    method: 'MANUAL_GROUP',
-    completedCount: 0,
-    totalCount: 5,
-    scheduledLabel: '16:30 - Hôm nay',
-    subTimeLabel: 'Còn ~2 giờ nữa',
-    calendarDay: 24,
-    mediaUrls: [],
-    items: [
-      {
-        id: 'ti-31',
-        groupName: 'Hội Cư Dân The Matrix One',
-        groupUid: '5549285720194',
-        memberCountLabel: '28k mem',
-        status: 'QUEUED',
-        statusDetail: 'Lên lịch tự động lúc 16:30 hôm nay',
-        timestamp: '16:30',
-      },
-      {
-        id: 'ti-32',
-        groupName: 'BĐS Tây Mỗ - Mỹ Đình',
-        groupUid: '6649285720194',
-        memberCountLabel: '74k mem',
-        status: 'QUEUED',
-        statusDetail: 'Lên lịch tự động lúc 16:31 hôm nay',
-        timestamp: '16:31',
-      },
-    ],
-    logs: [
-      {
-        time: '14:00:00',
-        tag: '[CRON]',
-        message: 'Scheduled in queue for 16:30 GMT+7',
-        tone: 'info',
-      },
-    ],
-  },
-  {
-    id: 'TASK-89180',
-    status: 'COMPLETED',
-    slotNumber: 3,
-    mediaType: 'link',
-    mediaSummary: '(Kèm link)',
-    content:
-      'Bán gấp nhà mặt phố Hoàng Quốc Việt, 6 tầng thang máy kinh doanh đỉnh cao, vỉa hè rộng 5m đá bóng, giá đầu tư...',
-    accountId: 'acc-1',
-    accountName: 'Hà Nội Land Official',
-    accountInitials: 'FP',
-    accountRoleLabel: 'Fanpage Meta API',
-    destinationSummary: '4 nhóm Facebook',
-    destinationDetail: 'Mua Bán Nhà Phố HN, Đầu Tư Nhà',
-    method: 'META_PAGE_API',
-    completedCount: 4,
-    totalCount: 4,
-    scheduledLabel: '10:45 - Hôm nay',
-    subTimeLabel: 'Thành công tuyệt đối',
-    calendarDay: 24,
-    mediaUrls: [],
-    items: [
-      {
-        id: 'ti-41',
-        groupName: 'Mua Bán Nhà Phố Hà Nội',
-        groupUid: '7749285720194',
-        memberCountLabel: '112k mem',
-        status: 'SUCCESS',
-        statusDetail: 'Thành công qua Meta API',
-        timestamp: '10:45',
-        permalink: 'https://facebook.com/posts/1029384',
-      },
-      {
-        id: 'ti-42',
-        groupName: 'Đầu Tư Nhà Đất Thổ Cư',
-        groupUid: '8849285720194',
-        memberCountLabel: '95k mem',
-        status: 'SUCCESS',
-        statusDetail: 'Thành công qua Meta API',
-        timestamp: '10:46',
-        permalink: 'https://facebook.com/posts/1029385',
-      },
-    ],
-    logs: [
-      {
-        time: '10:45:00',
-        tag: '[API]',
-        message: 'Published 4/4 items via Meta Graph API v20.0',
-        tone: 'success',
-      },
-    ],
-  },
-  {
-    id: 'TASK-89172',
-    status: 'PARTIAL_FAILED',
-    slotNumber: 1,
-    mediaType: 'images',
-    mediaSummary: '(2 ảnh)',
-    content:
-      'Bán 120m2 đất thổ cư Hoài Đức sát Vành đai 4, sổ đỏ cất két, pháp lý chuẩn chỉnh sang tên ngay trong ngày...',
-    accountId: 'acc-1',
-    accountName: 'Nguyễn Minh Anh',
-    accountInitials: 'NA',
-    accountRoleLabel: 'Profile Bán Hàng',
-    destinationSummary: '4 nhóm Facebook',
-    destinationDetail: '1 nhóm bị chặn phê duyệt',
-    method: 'MANUAL_GROUP',
-    completedCount: 3,
-    totalCount: 4,
-    scheduledLabel: '09:15 - Hôm nay',
-    subTimeLabel: 'Spam block cảnh báo',
-    calendarDay: 24,
-    mediaUrls: [],
-    items: [
-      {
-        id: 'ti-51',
-        groupName: 'Đất Nền Hoài Đức - Đan Phượng',
-        groupUid: '991283746501',
-        memberCountLabel: '48k mem',
-        status: 'SUCCESS',
-        statusDetail: 'Đã đăng thành công',
-        timestamp: '09:16',
-      },
-      {
-        id: 'ti-52',
-        groupName: 'Nhà Đất Vành Đai 4',
-        groupUid: '991283746502',
-        memberCountLabel: '39k mem',
-        status: 'SUCCESS',
-        statusDetail: 'Đã đăng thành công',
-        timestamp: '09:18',
-      },
-      {
-        id: 'ti-53',
-        groupName: 'Chợ BĐS Tây Hà Nội',
-        groupUid: '991283746503',
-        memberCountLabel: '62k mem',
-        status: 'SUCCESS',
-        statusDetail: 'Đã đăng thành công',
-        timestamp: '09:20',
-      },
-      {
-        id: 'ti-54',
-        groupName: 'Cộng Đồng Đầu Tư Vành Đai 4',
-        groupUid: '991283746504',
-        memberCountLabel: '29k mem',
-        status: 'FAILED',
-        statusDetail: 'Lỗi: Tài khoản tạm giới hạn đăng bài trong nhóm này',
-        timestamp: '09:22',
-      },
-    ],
-    logs: [
-      {
-        time: '09:22:11',
-        tag: '[ERR]',
-        message: 'Group blocked action: Anti-spam checkpoint guard triggered. Auto-skipped.',
-        tone: 'error',
-      },
-    ],
-  },
-];
-
-export const UPCOMING_SCHEDULE_ITEMS = [
-  {
-    id: 'TASK-89195',
-    timeBadge: '16:30 Hôm nay',
-    isToday: true,
-    title: 'Căn hộ Vinhomes Smart City',
-    target: '5 nhóm (MANUAL_GROUP)',
-    day: 24,
-  },
-  {
-    id: 'TASK-89196',
-    timeBadge: '20:00 Hôm nay',
-    isToday: true,
-    title: 'Bản tin thị trường BĐS tối',
-    target: '8 nhóm (MANUAL_GROUP)',
-    day: 24,
-  },
-  {
-    id: 'TASK-89197',
-    timeBadge: '09:00 Ngày mai (25/10)',
-    isToday: false,
-    title: 'Mở bán Shophouse Cầu Giấy',
-    target: '6 nhóm (MANUAL_GROUP)',
-    day: 25,
-  },
-  {
-    id: 'TASK-89199',
-    timeBadge: '14:00 Ngày mai (25/10)',
-    isToday: false,
-    title: 'Bảng giá căn hộ 2PN Q3',
-    target: '3 Fanpage (META_PAGE_API)',
-    day: 25,
-  },
-];
-
-export const INITIAL_ORDERS: PaymentOrder[] = [
-  {
-    id: 'ORD-20241024-8902',
-    plan: 'BUSINESS',
-    cycle: 'yearly',
-    amount: 1990000,
-    createdAt: '24/10/2024 10:15',
-    paidAt: '--',
-    status: 'PENDING',
-    bankName: 'MBBank',
-  },
-  {
-    id: 'ORD-20240115-4105',
-    plan: 'PRO',
-    cycle: 'yearly',
-    amount: 990000,
-    createdAt: '15/01/2024 09:00',
-    paidAt: '15/01/2024 09:02',
-    status: 'PAID',
-    bankName: 'Vietcombank',
-  },
-  {
-    id: 'ORD-20231215-2291',
-    plan: 'BASIC',
-    cycle: 'monthly',
-    amount: 49000,
-    createdAt: '15/12/2023 14:02',
-    paidAt: '15/12/2023 14:03',
-    status: 'PAID',
-    bankName: 'MBBank',
-  },
-  {
-    id: 'ORD-20231210-1840',
-    plan: 'PRO',
-    cycle: 'monthly',
-    amount: 99000,
-    createdAt: '10/12/2023 18:30',
-    paidAt: '--',
-    status: 'EXPIRED',
-  },
-];
-
-export const INITIAL_ADMIN_USERS: AdminUser[] = [
-  {
-    id: 'usr-1',
-    name: 'Nguyễn Minh Anh',
-    email: 'nguyenminhanh@company.com',
-    initials: 'MA',
-    avatarUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBCSw7QkQb18wzzRnghJSrjxueawGoplPkGheaYm89Ic2YJSD5wdk_r9glqN9Cfqq5gs4Gyod2y7dmBvKv45qUR2OWrbcXoH-Gl3O6Gs9LoEAL4EIwIf_XsoDplliA5WWtmZ61ppOhs39Dzuxn51VJX_FA5LrV65eiETf1O2BjLvrWm0R1jG_fuBLwbvi1t0ablQPg6b6_CrKCv4Thc24T1LNQ5BHWBHlZU4Bhox-g',
-    verified: true,
-    role: 'Member',
-    plan: 'PRO',
-    planExpiry: 'Hết hạn: 15/01/2025',
-    fbAccountsUsed: 3,
-    fbAccountsMax: 3,
-    groupsCount: 248,
-    status: 'ACTIVE',
-    createdAt: '12/08/2024',
-  },
-  {
-    id: 'usr-2',
-    name: 'Hoàng Lan Chi',
-    email: 'lanchi.bds@gmail.com',
-    initials: 'LC',
-    avatarUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDLt0yCfEGe5NNqsg4uY51uoNlYtXUzMtIbamWremtDYEu-7HZRzQQOVB4FnE3FW3iVn0IQCLlKkj76Y7FQf73hWBMOG2zCY3VwG5dX_1hSMP0A2JB-CtYmhhJ7RZzVLh1mlV_vu_h2WHyKYRB3taqaO3v02HDIvJjHuHgvm8rRoqO3PWUB712hfQof9jn3DSIZyquwAwGVgm_jAl_bwHNNUDzp0dUF6y8wNsB9-1M',
-    verified: true,
-    role: 'Member',
-    plan: 'BUSINESS',
-    planExpiry: 'Hết hạn: 28/11/2024',
-    fbAccountsUsed: 5,
-    fbAccountsMax: 10,
-    groupsCount: 890,
-    status: 'ACTIVE',
-    createdAt: '24/09/2024',
-  },
-  {
-    id: 'usr-3',
-    name: 'Phạm Quốc Tuấn',
-    email: 'tuanpq.marketing@agency.vn',
-    initials: 'QT',
-    verified: false,
-    role: 'Member',
-    plan: 'BASIC',
-    planExpiry: 'Quá hạn (10/10/2024)',
-    fbAccountsUsed: 1,
-    fbAccountsMax: 1,
-    groupsCount: 95,
-    status: 'EXPIRED',
-    createdAt: '03/07/2024',
-  },
-  {
-    id: 'usr-4',
-    name: 'Đỗ Mạnh Thắng',
-    email: 'thangdm.spam@gmail.com',
-    initials: 'MT',
-    verified: false,
-    role: 'Member',
-    plan: 'NONE',
-    planExpiry: 'Không đăng ký',
-    fbAccountsUsed: 0,
-    fbAccountsMax: 0,
-    groupsCount: 0,
-    status: 'LOCKED',
-    createdAt: '19/10/2024',
-  },
-  {
-    id: 'usr-5',
-    name: 'Vũ Thành Đạt',
-    email: 'datvt.admin@fbpostpro.vn',
-    initials: 'TĐ',
-    avatarUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCiXxTKKQkOrhmUYPua_DdT6xRlkksD4hWE-QUlzUFm9pbPdzO_h_h9b9dysWhefJ4mRhUterrN7GbAH46pihXtMVuw29LXfLK9EzaZ_oxJR8ESXT1c2lWMbhbBEaOpH2B-MaHtS37q2gZh1nk-U71IQgZyyI3TECm5MH4ex-CQR0fecMAXM71HH4KKT_lCFDhe5CdL7qzBqx1UtwXjoDVlkjfux0w6pS8RJJCMYzs',
-    verified: true,
-    role: 'SuperAdmin',
-    plan: 'ROOT SYSTEM',
-    planExpiry: 'Vô hạn thời hạn',
-    fbAccountsUsed: 99,
-    fbAccountsMax: 99,
-    groupsCount: 9999,
-    status: 'ACTIVE',
-    createdAt: '01/01/2024',
-  },
-];
-
-export const INITIAL_EXTENSION_SETTINGS: ExtensionSettings = {
-  minDelaySec: 45,
-  maxDelaySec: 90,
-  humanEmulation: true,
-  autoPauseOnWarning: true,
-  dailyLimitPerAccount: 50,
-  groupSyncHours: 6,
-};
+}

@@ -1,177 +1,225 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useApp } from '../state/AppContext';
 
 interface ConnectAccountModalProps {
   open: boolean;
   onClose: () => void;
-  onConnectOAuth: () => void;
-  onAddManual: (displayName: string, facebookUid: string) => void;
-  onNotify: (type: 'success' | 'info' | 'warning' | 'error', msg: string) => void;
 }
 
-export const ConnectAccountModal: React.FC<ConnectAccountModalProps> = ({
-  open,
-  onClose,
-  onConnectOAuth,
-  onAddManual,
-  onNotify,
-}) => {
+export const ConnectAccountModal: React.FC<ConnectAccountModalProps> = ({ open, onClose }) => {
+  const { createManualProfile, simulateDemoOAuthConnect, addToast } = useApp();
+  const [tab, setTab] = useState<'oauth' | 'manual'>('oauth');
   const [displayName, setDisplayName] = useState('');
   const [facebookUid, setFacebookUid] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setDisplayName('');
+    setFacebookUid('');
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [open, onClose]);
 
   if (!open) return null;
 
-  const handleSaveManual = (e: React.FormEvent) => {
+  const handleSubmitOAuthDemo = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!displayName.trim()) {
-      onNotify('warning', 'Vui lòng nhập Tên hiển thị tài khoản.');
+    setError(null);
+    const res = simulateDemoOAuthConnect(displayName);
+    if (!res.ok) {
+      setError(res.error ?? 'Không thể tạo hồ sơ Meta OAuth DEMO.');
       return;
     }
-    onAddManual(displayName.trim(), facebookUid.trim());
-    setDisplayName('');
-    setFacebookUid('');
+    addToast(
+      'success',
+      'Đã tạo hồ sơ Meta OAuth (DEMO)',
+      `${res.data?.account.displayName} kèm 1 Fanpage mẫu đã được thêm.`
+    );
+    onClose();
+  };
+
+  const handleSubmitManual = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    const res = createManualProfile({
+      displayName,
+      facebookUid: facebookUid.trim() || null,
+    });
+    if (!res.ok) {
+      setError(res.error ?? 'Không thể thêm hồ sơ thủ công.');
+      return;
+    }
+    addToast(
+      'success',
+      'Đã thêm hồ sơ thủ công',
+      `"${res.data?.displayName}" ở trạng thái Chưa xác minh (UNVERIFIED).`
+    );
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-[85] flex items-center justify-center bg-inverse-surface/40 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-lg bg-surface-container-lowest rounded-xl shadow-2xl flex flex-col overflow-hidden border border-surface-container">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 bg-surface-container-low">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-primary-container text-on-primary flex items-center justify-center">
-              <span className="material-symbols-outlined text-[18px]">person_add</span>
-            </div>
-            <div>
-              <h3 className="text-[16px] font-semibold text-on-surface leading-tight">
-                Kết nối tài khoản Facebook
-              </h3>
-              <p className="text-[11px] text-on-surface-variant font-mono leading-none mt-0.5">
-                Mã hành động: ACC-01
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center transition-colors"
-          >
-            <span className="material-symbols-outlined text-[20px]">close</span>
-          </button>
-        </div>
-
-        {/* Modal Body */}
-        <div className="p-5 flex flex-col gap-4">
-          {/* Method 1: Meta Official OAuth */}
-          <div className="flex flex-col gap-2.5 p-3.5 rounded-xl bg-surface-container-low/70">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[18px] text-primary-container">
-                  verified
-                </span>
-                <span className="text-[13px] font-semibold text-on-surface">
-                  Cách 1: Kết nối qua Meta
-                </span>
-              </div>
-              <span className="text-[11px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-[2px] rounded">
-                Khuyến nghị
-              </span>
-            </div>
-            <p className="text-[13px] text-on-surface-variant leading-relaxed">
-              Xác thực OAuth chính thức từ Meta. An toàn 100%, bảo vệ tài khoản, tự động nhận diện
-              danh sách Fanpage và quyền <code className="font-mono text-primary">can_publish</code>.
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/45 backdrop-blur-xs p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="connect-account-title"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 id="connect-account-title" className="text-sm font-bold text-slate-900">
+              Thêm hồ sơ Facebook
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Không yêu cầu nhập mật khẩu Facebook hay cookie trình duyệt.
             </p>
-            <div className="pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  onConnectOAuth();
-                  onClose();
-                }}
-                className="w-full h-9 bg-primary-container hover:bg-primary text-on-primary text-[13px] font-semibold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-              >
-                <span className="material-symbols-outlined text-[18px]">passkey</span>
-                <span>Tiếp tục với Facebook (Meta OAuth)</span>
-              </button>
-            </div>
           </div>
-
-          {/* Divider */}
-          <div className="relative flex items-center justify-center">
-            <div className="w-full h-[1px] bg-surface-container" />
-            <span className="absolute bg-surface-container-lowest px-2.5 text-[11px] text-on-surface-variant uppercase tracking-wider font-medium">
-              Hoặc thêm nhanh
-            </span>
-          </div>
-
-          {/* Method 2: Manual Profile Creation */}
-          <form id="manual-account-form" onSubmit={handleSaveManual} className="flex flex-col gap-3">
-            <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[18px] text-secondary">badge</span>
-              <span className="text-[13px] font-semibold text-on-surface">
-                Cách 2: Thêm hồ sơ thủ công
-              </span>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-on-surface font-medium flex items-center justify-between">
-                <span>
-                  Tên hiển thị tài khoản (display_name) <span className="text-error">*</span>
-                </span>
-                <span className="text-[11px] text-on-surface-variant">Bắt buộc</span>
-              </label>
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Ví dụ: Hoàng Lan Chi (Clone 02)"
-                className="w-full h-8 px-3 bg-surface-container-low text-on-surface placeholder:text-on-surface-variant text-[13px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-container"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-on-surface font-medium flex items-center justify-between">
-                <span>Facebook UID (facebook_uid)</span>
-                <span className="text-[11px] text-on-surface-variant">Tùy chọn</span>
-              </label>
-              <input
-                type="text"
-                value={facebookUid}
-                onChange={(e) => setFacebookUid(e.target.value)}
-                placeholder="Ví dụ: 10008920194819"
-                className="w-full h-8 px-3 bg-surface-container-low text-on-surface placeholder:text-on-surface-variant text-[13px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-container font-mono"
-              />
-            </div>
-
-            <div className="p-2.5 rounded-lg bg-amber-500/10 flex items-start gap-2">
-              <span className="material-symbols-outlined text-[16px] text-amber-600 shrink-0 mt-0.5">
-                info
-              </span>
-              <p className="text-[11px] text-amber-900 leading-relaxed">
-                <strong>Lưu ý bảo mật:</strong> Hồ sơ thêm thủ công sẽ ở trạng thái{' '}
-                <span className="font-mono font-semibold">UNVERIFIED</span> (Chưa xác minh). Bạn
-                sẽ cần hoàn tất xác thực thông qua Extension để bắt đầu đăng bài tự động.{' '}
-                <em>Hệ thống cam kết không bao giờ yêu cầu mật khẩu hay mã 2FA.</em>
-              </p>
-            </div>
-          </form>
-        </div>
-
-        {/* Modal Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-3 bg-surface-container-low">
           <button
             type="button"
             onClick={onClose}
-            className="h-8 px-4 rounded-lg text-on-surface hover:bg-surface-container-high text-[13px] font-medium transition-colors"
+            aria-label="Đóng"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-200/70"
           >
-            Hủy bỏ
+            <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
-          <button
-            type="submit"
-            form="manual-account-form"
-            className="h-8 px-4 bg-surface-container-highest hover:bg-primary-container hover:text-on-primary text-on-surface text-[13px] rounded-lg transition-colors font-medium whitespace-nowrap"
-          >
-            Lưu hồ sơ thủ công
-          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Tabs */}
+          <div className="grid grid-cols-2 gap-1.5 p-1 rounded-lg bg-slate-100">
+            <button
+              type="button"
+              onClick={() => {
+                setTab('oauth');
+                setError(null);
+              }}
+              className={`h-8 rounded-md text-xs font-semibold transition-colors ${
+                tab === 'oauth' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600'
+              }`}
+            >
+              Meta OAuth (DEMO)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTab('manual');
+                setError(null);
+              }}
+              className={`h-8 rounded-md text-xs font-semibold transition-colors ${
+                tab === 'manual' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600'
+              }`}
+            >
+              Hồ sơ thủ công
+            </button>
+          </div>
+
+          {error && (
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+              {error}
+            </div>
+          )}
+
+          {tab === 'oauth' ? (
+            <form onSubmit={handleSubmitOAuthDemo} className="space-y-4">
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+                <p className="font-bold">Chế độ DEMO / Chưa kết nối Meta OAuth thực tế</p>
+                <p className="leading-relaxed">
+                  Trong môi trường production, nút này sẽ chuyển hướng tới Meta OAuth chính thức để
+                  cấp quyền quản lý Fanpage. Hiện tại bạn có thể tạo một hồ sơ Meta OAuth mẫu để
+                  kiểm thử luồng đăng Fanpage.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Tên hiển thị hồ sơ mẫu <span className="text-rose-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  required
+                  placeholder="Ví dụ: Nguyễn Văn A — Marketing"
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/25"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="h-9 px-4 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-semibold"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+                >
+                  Tạo kết nối Meta OAuth (DEMO)
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={handleSubmitManual} className="space-y-4">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700">
+                Hồ sơ thủ công dùng để phân loại tác vụ đăng nhóm thủ công. Trạng thái mặc định là{' '}
+                <strong>Chưa xác minh (UNVERIFIED)</strong> và không hỗ trợ đăng Fanpage qua API.
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Tên hồ sơ Facebook <span className="text-rose-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  required
+                  placeholder="Ví dụ: Hồ sơ bán hàng cá nhân"
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/25"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Facebook UID (tùy chọn — để trống nếu chưa rõ)
+                </label>
+                <input
+                  type="text"
+                  value={facebookUid}
+                  onChange={(e) => setFacebookUid(e.target.value)}
+                  placeholder="Để trống nếu chưa có"
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/25"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="h-9 px-4 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-semibold"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+                >
+                  Thêm hồ sơ thủ công
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     </div>

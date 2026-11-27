@@ -1,363 +1,493 @@
-import React, { useEffect } from 'react';
-import { PublishingTask } from '../types/app';
-import { SafeImage } from './SafeImage';
+import React, { useEffect, useState } from 'react';
+import { useApp } from '../state/AppContext';
+import type { PublishingTaskItem, TaskItemStatus } from '../types/domain';
+import { formatVietnamDateTime } from '../utils/dateTime';
+import {
+  canCancelTask,
+  canConfirmItem,
+  canPauseTask,
+  canResumeTask,
+  canRetryItem,
+  getTaskProgress,
+  TASK_ITEM_STATUS_META,
+  TASK_STATUS_META,
+} from '../utils/taskStatus';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface TaskDrawerProps {
-  task: PublishingTask | null;
+  taskId: string | null;
   onClose: () => void;
-  onPauseResume: (taskId: string) => void;
-  onCancelTask: (taskId: string) => void;
-  onRetryFailed: (taskId: string) => void;
-  onConfirmWaiting: (taskId: string) => void;
-  onNotify: (type: 'success' | 'info' | 'warning' | 'error', msg: string) => void;
 }
 
-const STATUS_BADGE: Record<
-  PublishingTask['status'],
-  { label: string; badgeClass: string }
-> = {
-  RUNNING: { label: 'ĐANG CHẠY', badgeClass: 'bg-blue-100 text-primary-container' },
-  WAITING_CONFIRMATION: { label: 'CHỜ DUYỆT', badgeClass: 'bg-amber-100 text-amber-900' },
-  SCHEDULED: { label: 'CHỜ TỚI GIỜ', badgeClass: 'bg-amber-50 text-amber-800' },
-  COMPLETED: { label: 'HOÀN THÀNH', badgeClass: 'bg-emerald-100 text-emerald-800' },
-  PARTIAL_FAILED: { label: 'LỖI MỘT PHẦN', badgeClass: 'bg-rose-100 text-rose-800' },
-  CANCELLED: { label: 'ĐÃ HỦY', badgeClass: 'bg-surface-container text-secondary' },
-};
+export const TaskDrawer: React.FC<TaskDrawerProps> = ({ taskId, onClose }) => {
+  const {
+    tasks,
+    accounts,
+    pauseTask,
+    resumeTask,
+    cancelTask,
+    confirmTaskItem,
+    retryTaskItem,
+    retryFailedItems,
+    addToast,
+  } = useApp();
 
-export const TaskDrawer: React.FC<TaskDrawerProps> = ({
-  task,
-  onClose,
-  onPauseResume,
-  onCancelTask,
-  onRetryFailed,
-  onConfirmWaiting,
-  onNotify,
-}) => {
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [confirmingItem, setConfirmingItem] = useState<PublishingTaskItem | null>(null);
+  const [itemOutcome, setItemOutcome] = useState<
+    Extract<TaskItemStatus, 'SUCCESS' | 'FAILED' | 'NEEDS_REVIEW'>
+  >('SUCCESS');
+  const [resultPostUrl, setResultPostUrl] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const task = taskId ? tasks.find((t) => t.id === taskId) ?? null : null;
+
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && task) onClose();
+    if (!taskId) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (confirmingItem) {
+          setConfirmingItem(null);
+        } else if (!confirmCancelOpen) {
+          onClose();
+        }
+      }
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [task, onClose]);
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [taskId, confirmingItem, confirmCancelOpen, onClose]);
 
-  if (!task) return null;
+  if (!taskId || !task) return null;
 
-  const badge = STATUS_BADGE[task.status];
-  const progressPct =
-    task.totalCount > 0 ? Math.round((task.completedCount / task.totalCount) * 100) : 0;
+  const progress = getTaskProgress(task.items);
+  const statusMeta = TASK_STATUS_META[task.status];
+  const account = accounts.find((a) => a.id === task.facebookAccountId) ?? null;
+
+  const openConfirmModal = (item: PublishingTaskItem) => {
+    setConfirmingItem(item);
+    setItemOutcome('SUCCESS');
+    setResultPostUrl(item.resultPostUrl ?? '');
+    setErrorMessage(item.errorMessage ?? '');
+  };
+
+  const handleSubmitItemConfirmation = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!confirmingItem) return;
+    const res = confirmTaskItem({
+      taskId: task.id,
+      itemId: confirmingItem.id,
+      status: itemOutcome,
+      resultPostUrl: itemOutcome === 'SUCCESS' ? resultPostUrl.trim() || null : null,
+      errorMessage: itemOutcome !== 'SUCCESS' ? errorMessage.trim() || null : null,
+    });
+    if (!res.ok) {
+      addToast('error', 'Không thể xác nhận mục', res.error);
+      return;
+    }
+    addToast(
+      'success',
+      'Đã cập nhật kết quả mục đăng',
+      `${confirmingItem.destinationNameSnapshot} → ${TASK_ITEM_STATUS_META[itemOutcome].label}`
+    );
+    setConfirmingItem(null);
+  };
 
   return (
-    <div className="fixed inset-0 z-[70] flex justify-end">
-      {/* Backdrop */}
+    <div
+      className="fixed inset-0 z-[75] flex justify-end bg-slate-900/40 backdrop-blur-xs"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="task-drawer-title"
+      onClick={onClose}
+    >
       <div
-        className="fixed inset-0 bg-inverse-surface/40 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
-
-      {/* Drawer Panel */}
-      <aside className="relative z-10 h-full w-full max-w-[560px] bg-surface-container-lowest shadow-2xl flex flex-col">
-        {/* Drawer Header */}
-        <div className="px-space-xl py-space-md bg-surface-container-low flex items-center justify-between shrink-0">
-          <div className="flex flex-col">
-            <div className="flex items-center gap-space-xs">
-              <span className="text-lg font-bold text-on-surface leading-tight font-mono">
-                #{task.id}
-              </span>
+        className="w-full max-w-2xl bg-white h-full shadow-2xl border-l border-slate-200 flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-start justify-between gap-3 shrink-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 id="task-drawer-title" className="text-base font-bold text-slate-900">
+                Chi tiết tác vụ
+              </h2>
               <span
-                className={`text-[11px] px-space-xs py-[2px] rounded font-semibold uppercase ${badge.badgeClass}`}
+                className={`px-2.5 py-0.5 rounded-full border text-[11px] font-bold ${statusMeta.badgeClass}`}
               >
-                {badge.label}
+                {statusMeta.label}
               </span>
             </div>
-            <span className="text-[11px] text-on-surface-variant mt-[2px]">
-              Chi tiết tiến trình phân phối và nhật ký xuất bản
-            </span>
+            <p className="text-xs text-slate-500 font-mono mt-1 truncate">ID: {task.id}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
-            title="Đóng ngăn chi tiết"
+            aria-label="Đóng chi tiết tác vụ"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-200/70 shrink-0"
           >
-            <span className="material-symbols-outlined text-[18px]">close</span>
+            <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
 
-        {/* Drawer Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-space-xl flex flex-col gap-space-lg">
-          {/* Summary Card */}
-          <div className="bg-surface-container-low/60 rounded-xl p-space-md flex flex-col gap-space-sm">
-            <div className="grid grid-cols-2 gap-space-sm text-[11px]">
-              <div>
-                <span className="text-on-surface-variant block">Tài khoản thực thi:</span>
-                <span className="font-semibold text-on-surface text-[13px]">
-                  {task.accountName}
-                </span>
-              </div>
-              <div>
-                <span className="text-on-surface-variant block">Phương thức đăng:</span>
-                <span className="font-semibold text-on-surface text-[13px]">
-                  {task.method === 'MANUAL_GROUP'
-                    ? 'Chrome Extension (MANUAL_GROUP)'
-                    : 'Fanpage Graph API (META_PAGE_API)'}
-                </span>
-              </div>
-              <div>
-                <span className="text-on-surface-variant block">Thời gian lên lịch:</span>
-                <span className="font-semibold text-on-surface tabular-nums">
-                  {task.scheduledLabel}
-                </span>
-              </div>
-              <div>
-                <span className="text-on-surface-variant block">Độ trễ giãn cách:</span>
-                <span className="font-semibold text-primary font-mono">
-                  45s - 90s (An toàn)
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-space-xs pt-space-xs">
-              <div className="flex items-center justify-between text-xs font-semibold mb-1">
-                <span className="text-on-surface">Tiến độ xuất bản tổng thể</span>
-                <span className="text-primary-container tabular-nums">
-                  {task.completedCount} / {task.totalCount} nhóm hoàn thành ({progressPct}%)
-                </span>
-              </div>
-              <div className="w-full h-2 bg-surface-container rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary-container rounded-full transition-all duration-300"
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Content Snapshot */}
-          <div className="flex flex-col gap-space-xs">
-            <span className="text-[13px] font-semibold text-on-surface">
-              Nội dung bài viết đã cấu hình
-            </span>
-            <div className="bg-surface rounded-xl p-space-md flex flex-col gap-space-sm shadow-sm border border-surface-container">
-              <p className="text-[13px] text-on-surface leading-relaxed whitespace-pre-line">
-                {task.content}
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          {/* Metadata Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <p className="text-[11px] text-slate-500">Hồ sơ Facebook</p>
+              <p className="font-semibold text-slate-900 mt-0.5 truncate">
+                {account ? account.displayName : 'Không gán hồ sơ'}
               </p>
-              {task.mediaUrls.length > 0 && (
-                <div className="grid grid-cols-4 gap-2 pt-2">
-                  {task.mediaUrls.slice(0, 3).map((url, idx) => (
-                    <div
-                      key={idx}
-                      className="aspect-square bg-surface-container-high rounded-lg overflow-hidden relative"
-                    >
-                      <SafeImage
-                        src={url}
-                        alt={`Ảnh đính kèm ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ))}
-                  <div className="aspect-square bg-surface-container-high rounded-lg overflow-hidden flex items-center justify-center font-bold text-on-surface-variant text-xs">
-                    +{Math.max(1, task.mediaUrls.length - 2)} ảnh
-                  </div>
-                </div>
-              )}
+            </div>
+            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <p className="text-[11px] text-slate-500">Chế độ thực thi</p>
+              <p className="font-semibold text-slate-900 mt-0.5">
+                {task.executionMode === 'MANUAL_GROUP' ? 'Nhóm (Thủ công)' : 'Fanpage (Meta API)'}
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <p className="text-[11px] text-slate-500">
+                {task.scheduledAt ? 'Lịch đăng (GMT+7)' : 'Tạo lúc (GMT+7)'}
+              </p>
+              <p className="font-semibold text-slate-900 mt-0.5">
+                {formatVietnamDateTime(task.scheduledAt ?? task.createdAt)}
+              </p>
             </div>
           </div>
 
-          {/* Target Items Breakdown */}
-          <div className="flex flex-col gap-space-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-on-surface">
-                Danh sách nhóm mục tiêu ({task.items.length})
+          {/* Progress Summary */}
+          <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-2.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-800">
+                Tiến độ tổng hợp ({progress.completed}/{progress.total} thành công)
               </span>
-              <span className="text-[11px] text-on-surface-variant">
-                Tự động kiểm tra link sau khi đăng
-              </span>
+              <span className="font-mono font-bold text-blue-700">{progress.progressPercent}%</span>
             </div>
+            <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+              <div
+                className="h-full bg-blue-600 transition-all"
+                style={{ width: `${progress.progressPercent}%` }}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-600 pt-1">
+              <span>Thành công: <strong>{progress.completed}</strong></span>
+              <span>Chờ xác nhận: <strong>{progress.waitingConfirmation}</strong></span>
+              <span>Chờ xử lý: <strong>{progress.pending}</strong></span>
+              <span>Thất bại: <strong className="text-rose-600">{progress.failed}</strong></span>
+              <span>Cần kiểm tra: <strong className="text-purple-700">{progress.needsReview}</strong></span>
+              <span>Đã hủy: <strong>{progress.cancelled}</strong></span>
+            </div>
+          </div>
 
-            <div className="flex flex-col gap-space-xs">
-              {task.items.map((item) => {
-                const isSuccess = item.status === 'SUCCESS';
-                const isRunning = item.status === 'RUNNING';
-                const isFailed = item.status === 'FAILED';
-                const isWaiting = item.status === 'WAITING_CONFIRMATION';
+          {/* Task-level Actions */}
+          <div className="flex flex-wrap items-center gap-2">
+            {canPauseTask(task) && (
+              <button
+                type="button"
+                onClick={() => {
+                  pauseTask(task.id);
+                  addToast('info', 'Đã tạm dừng tác vụ', 'Trạng thái đã chuyển sang Tạm dừng (PAUSED).');
+                }}
+                className="h-9 px-3.5 rounded-lg border border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-800 text-xs font-semibold inline-flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]">pause</span>
+                Tạm dừng
+              </button>
+            )}
+            {canResumeTask(task) && (
+              <button
+                type="button"
+                onClick={() => {
+                  resumeTask(task.id);
+                  addToast('success', 'Đã tiếp tục tác vụ');
+                }}
+                className="h-9 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]">play_arrow</span>
+                Tiếp tục tác vụ
+              </button>
+            )}
+            {progress.failed > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const res = retryFailedItems(task.id);
+                  if (res.ok) {
+                    addToast(
+                      'success',
+                      `Đã đưa ${progress.failed} mục thất bại vào hàng chờ thử lại`
+                    );
+                  } else {
+                    addToast('error', 'Không thể thử lại', res.error);
+                  }
+                }}
+                className="h-9 px-3.5 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold inline-flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]">refresh</span>
+                Thử lại tất cả mục lỗi ({progress.failed})
+              </button>
+            )}
+            {canCancelTask(task) && (
+              <button
+                type="button"
+                onClick={() => setConfirmCancelOpen(true)}
+                className="h-9 px-3.5 rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 text-xs font-semibold inline-flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]">cancel</span>
+                Hủy tác vụ
+              </button>
+            )}
+          </div>
 
-                return (
-                  <div
-                    key={item.id}
-                    className={`p-space-sm rounded-xl flex items-center justify-between gap-2 ${
-                      isRunning
-                        ? 'bg-blue-50/70'
-                        : isFailed
-                        ? 'bg-rose-50/70'
-                        : isWaiting
-                        ? 'bg-amber-50/70'
-                        : 'bg-surface-container-low/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-space-sm min-w-0">
-                      <span
-                        className={`material-symbols-outlined text-[20px] shrink-0 ${
-                          isSuccess
-                            ? 'text-emerald-600'
-                            : isRunning
-                            ? 'text-primary-container animate-spin'
-                            : isFailed
-                            ? 'text-rose-600'
-                            : isWaiting
-                            ? 'text-amber-600'
-                            : 'text-secondary'
-                        }`}
-                      >
-                        {isSuccess
-                          ? 'check_circle'
-                          : isRunning
-                          ? 'sync'
-                          : isFailed
-                          ? 'error'
-                          : isWaiting
-                          ? 'pending'
-                          : 'hourglass_empty'}
-                      </span>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-semibold text-on-surface truncate">
-                          {item.groupName}
-                        </span>
+          {/* Per-Item List */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+              Danh sách từng mục đăng ({task.items.length})
+            </h3>
+            {task.items.map((item, idx) => {
+              const itemMeta = TASK_ITEM_STATUS_META[item.status];
+              return (
+                <div
+                  key={item.id}
+                  className="p-4 rounded-xl border border-slate-200 bg-white space-y-3"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] font-mono text-slate-400">#{idx + 1}</span>
+                        <p className="text-sm font-bold text-slate-900">
+                          {item.destinationNameSnapshot}
+                        </p>
                         <span
-                          className={`text-[11px] truncate ${
-                            isSuccess
-                              ? 'text-emerald-800'
-                              : isRunning
-                              ? 'text-primary-container'
-                              : isFailed
-                              ? 'text-rose-700'
-                              : isWaiting
-                              ? 'text-amber-800'
-                              : 'text-on-surface-variant'
-                          }`}
+                          className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${itemMeta.badgeClass}`}
                         >
-                          {item.statusDetail}
+                          {itemMeta.label}
                         </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 mt-1">
+                        <span>Lần thử: <strong>{item.attemptCount}</strong></span>
+                        {item.confirmationType && (
+                          <span>
+                            Nguồn xác nhận:{' '}
+                            <strong>
+                              {item.confirmationType === 'USER' ? 'Người dùng' : 'API'}
+                            </strong>
+                          </span>
+                        )}
+                        {item.finishedAt && (
+                          <span>Hoàn tất: {formatVietnamDateTime(item.finishedAt)}</span>
+                        )}
                       </div>
                     </div>
 
-                    {isSuccess ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onNotify(
-                            'info',
-                            `Mở bài viết trên Facebook: ${item.permalink || item.groupName}`
-                          )
-                        }
-                        className="h-6 px-2 rounded bg-surface-container hover:bg-surface-container-high text-primary text-[11px] font-semibold flex items-center gap-1 transition-colors shrink-0"
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <a
+                        href={item.destinationUrlSnapshot}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold inline-flex items-center gap-1"
+                        title="Mở đích đăng trên Facebook (không tự đánh dấu thành công)"
                       >
-                        <span>Xem bài</span>
-                        <span className="material-symbols-outlined text-[12px]">open_in_new</span>
-                      </button>
-                    ) : isRunning ? (
-                      <span className="text-[11px] font-mono text-primary-container font-semibold shrink-0">
-                        Đang xử lý
-                      </span>
-                    ) : isFailed ? (
-                      <button
-                        type="button"
-                        onClick={() => onRetryFailed(task.id)}
-                        className="h-6 px-2 rounded bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-semibold shrink-0"
-                      >
-                        Thử lại
-                      </button>
-                    ) : isWaiting ? (
-                      <button
-                        type="button"
-                        onClick={() => onConfirmWaiting(task.id)}
-                        className="h-6 px-2 rounded bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-semibold shrink-0"
-                      >
-                        Xác nhận
-                      </button>
-                    ) : (
-                      <span className="text-[11px] font-mono text-secondary shrink-0">
-                        Xếp hàng
-                      </span>
+                        <span className="material-symbols-outlined text-[15px]">open_in_new</span>
+                        Mở đích
+                      </a>
+                      {canConfirmItem(item) && (
+                        <button
+                          type="button"
+                          onClick={() => openConfirmModal(item)}
+                          className="h-8 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold inline-flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">fact_check</span>
+                          Xác nhận
+                        </button>
+                      )}
+                      {canRetryItem(item) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const res = retryTaskItem(task.id, item.id);
+                            if (res.ok) {
+                              addToast('success', 'Đã đưa mục vào thử lại', item.destinationNameSnapshot);
+                            } else {
+                              addToast('error', 'Không thể thử lại', res.error);
+                            }
+                          }}
+                          className="h-8 px-2.5 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold inline-flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">refresh</span>
+                          Thử lại
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Immutable Snapshot Preview */}
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs text-slate-700 space-y-1.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                      Bản chụp nội dung (Snapshot bất biến)
+                    </p>
+                    <p className="whitespace-pre-line leading-relaxed">
+                      {item.contentSnapshot || '(Bài viết không có văn bản)'}
+                    </p>
+                    {item.linkSnapshot && (
+                      <p className="text-[11px] text-blue-700 break-all">
+                        Link: {item.linkSnapshot}
+                      </p>
+                    )}
+                    {item.mediaSnapshots.length > 0 && (
+                      <p className="text-[11px] text-slate-500">
+                        Đính kèm: {item.mediaSnapshots.length} tệp media (
+                        {item.mediaSnapshots.map((m) => m.originalName).join(', ')})
+                      </p>
                     )}
                   </div>
-                );
-              })}
-            </div>
-          </div>
 
-          {/* Extension Logs */}
-          <div className="flex flex-col gap-space-xs">
-            <span className="text-[13px] font-semibold text-on-surface">
-              Nhật ký máy khách (Chrome Extension Logs)
-            </span>
-            <div className="bg-inverse-surface text-inverse-on-surface p-space-sm rounded-xl font-mono text-[11px] leading-relaxed max-h-44 overflow-y-auto space-y-1">
-              {task.logs.map((log, i) => (
-                <p
-                  key={i}
-                  className={
-                    log.tone === 'success'
-                      ? 'text-emerald-400'
-                      : log.tone === 'warn'
-                      ? 'text-amber-300'
-                      : log.tone === 'error'
-                      ? 'text-rose-400'
-                      : 'text-blue-300'
-                  }
-                >
-                  [{log.time}] {log.tag} {log.message}
+                  {item.resultPostUrl && (
+                    <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+                      <span className="truncate">Link bài đăng: {item.resultPostUrl}</span>
+                      <a
+                        href={item.resultPostUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold underline shrink-0"
+                      >
+                        Xem bài
+                      </a>
+                    </div>
+                  )}
+
+                  {item.errorMessage && (
+                    <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                      <span className="font-bold">
+                        {item.errorCode ? `[${item.errorCode}] ` : ''}
+                      </span>
+                      {item.errorMessage}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Per-Item Result Confirmation Modal */}
+      {confirmingItem && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setConfirmingItem(null)}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Xác nhận kết quả đăng bài</h3>
+                <p className="text-xs text-slate-500 truncate mt-0.5">
+                  {confirmingItem.destinationNameSnapshot}
                 </p>
-              ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmingItem(null)}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-200/70"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
             </div>
+
+            <form onSubmit={handleSubmitItemConfirmation} className="p-5 space-y-4">
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Kết quả thực tế trên Facebook
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      { value: 'SUCCESS', label: 'Thành công', active: 'border-emerald-500 bg-emerald-50 text-emerald-800' },
+                      { value: 'FAILED', label: 'Thất bại', active: 'border-rose-500 bg-rose-50 text-rose-800' },
+                      { value: 'NEEDS_REVIEW', label: 'Cần kiểm tra', active: 'border-purple-500 bg-purple-50 text-purple-800' },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setItemOutcome(opt.value)}
+                      className={`h-9 rounded-lg border text-xs font-semibold transition-colors ${
+                        itemOutcome === opt.value
+                          ? opt.active
+                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {itemOutcome === 'SUCCESS' ? (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Link bài đăng sau khi đăng (tùy chọn)
+                  </label>
+                  <input
+                    type="url"
+                    value={resultPostUrl}
+                    onChange={(e) => setResultPostUrl(e.target.value)}
+                    placeholder="https://www.facebook.com/groups/.../posts/..."
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/25"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Lý do / ghi chú lỗi
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={errorMessage}
+                    onChange={(e) => setErrorMessage(e.target.value)}
+                    placeholder="Ví dụ: Nhóm yêu cầu chờ duyệt hoặc không cho phép đính kèm link..."
+                    className="w-full p-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/25 resize-none"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setConfirmingItem(null)}
+                  className="h-9 px-4 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-semibold"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+                >
+                  Lưu xác nhận
+                </button>
+              </div>
+            </form>
           </div>
         </div>
+      )}
 
-        {/* Drawer Footer */}
-        <div className="px-space-xl py-space-md bg-surface-container-low flex items-center justify-between shrink-0">
-          {task.status !== 'COMPLETED' && task.status !== 'CANCELLED' ? (
-            <button
-              type="button"
-              onClick={() => onCancelTask(task.id)}
-              className="h-8 px-space-md rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-[13px] font-semibold transition-colors flex items-center gap-space-xs"
-            >
-              <span className="material-symbols-outlined text-[16px]">stop_circle</span>
-              <span>Hủy tác vụ</span>
-            </button>
-          ) : (
-            <div />
-          )}
-
-          <div className="flex items-center gap-space-sm">
-            {task.status === 'RUNNING' && (
-              <button
-                type="button"
-                onClick={() => onPauseResume(task.id)}
-                className="h-8 px-space-md rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-[13px] font-semibold transition-colors flex items-center gap-space-xs"
-              >
-                <span className="material-symbols-outlined text-[16px]">pause</span>
-                <span>Tạm dừng</span>
-              </button>
-            )}
-            {task.status === 'PARTIAL_FAILED' && (
-              <button
-                type="button"
-                onClick={() => onRetryFailed(task.id)}
-                className="h-8 px-space-md rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[13px] font-semibold transition-colors flex items-center gap-space-xs"
-              >
-                <span className="material-symbols-outlined text-[16px]">replay</span>
-                <span>Thử lại lượt lỗi</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-8 px-space-lg rounded-lg bg-primary-container hover:bg-primary text-on-primary text-[13px] font-semibold transition-colors"
-            >
-              Xong
-            </button>
-          </div>
-        </div>
-      </aside>
+      <ConfirmDialog
+        open={confirmCancelOpen}
+        title="Hủy tác vụ đăng bài này?"
+        description="Các mục chưa xử lý sẽ chuyển sang Đã hủy; mục đang xử lý dở sẽ chuyển sang Cần kiểm tra; các mục đã thành công hoặc thất bại trước đó sẽ được giữ nguyên lịch sử."
+        confirmLabel="Xác nhận hủy tác vụ"
+        onCancel={() => setConfirmCancelOpen(false)}
+        onConfirm={() => {
+          cancelTask(task.id);
+          setConfirmCancelOpen(false);
+          addToast('warning', 'Đã hủy tác vụ', 'Lịch sử các mục đã hoàn thành vẫn được bảo toàn.');
+        }}
+      />
     </div>
   );
 };

@@ -1,0 +1,1544 @@
+# FB POST PRO — COMPLETE FRONTEND AUDIT & BUSINESS FLOW REFACTOR
+
+## 01. NHIỆM VỤ
+
+Bạn là Senior React TypeScript Engineer, UI/UX Engineer, Software Architect và QA Engineer.
+
+Hãy trực tiếp kiểm tra, chỉnh sửa và hoàn thiện mã nguồn hiện tại của dự án FB POST PRO.
+
+Repository:
+
+https://github.com/NguyenNQ-2004/GIAODIENTOOLFB.git
+
+Branch: main.
+
+Đây là nhiệm vụ sửa dự án hiện có, không phải tạo dự án mới.
+
+Giữ lại chất lượng thiết kế giao diện, màu sắc, bố cục, typography và các component đang hoạt động tốt.
+
+Mục tiêu chính:
+
+- Sửa lỗi luồng nghiệp vụ.
+- Sửa kiểu dữ liệu.
+- Chuẩn hóa hành động của từng nút.
+- Loại bỏ chức năng ngoài phạm vi.
+- Đồng bộ với Database Contract.
+- Chuẩn bị mã nguồn để OpenAI Codex tích hợp Backend PostgreSQL và Chrome Extension thật.
+
+Không triển khai Backend thật trong nhiệm vụ này.
+
+Không tuyên bố đã kết nối Facebook, Meta API, PostgreSQL, VietQR hoặc Chrome Extension thật.
+
+## 02. PHÂN TÍCH MÃ NGUỒN HIỆN TẠI
+
+Đọc toàn bộ các file:
+
+- src/App.tsx
+- src/types/app.ts
+- src/data/mockData.ts
+- src/index.css
+- src/components/LayoutShell.tsx
+- src/components/TaskDrawer.tsx
+- src/components/ConnectAccountModal.tsx
+- src/components/ExtensionGuideModal.tsx
+- src/pages/PostComposerPage.tsx
+- src/pages/DashboardPage.tsx
+- src/pages/AccountsPage.tsx
+- src/pages/PricingPage.tsx
+- src/pages/AuthPage.tsx
+- src/pages/AdminPage.tsx
+- src/pages/ExtensionPopupPage.tsx
+- package.json
+
+Đọc thêm toàn bộ thư mục design/ để đối chiếu thiết kế.
+
+Không bỏ qua các handler trong App.tsx.
+
+Không chỉ sửa phần HTML hiển thị.
+
+Phải sửa cả types, mock data, state management, validation, event handlers và navigation flow.
+
+## 03. PHẠM VI SẢN PHẨM
+
+FB POST PRO chỉ là công cụ đăng bài Facebook thương mại.
+
+Chỉ giữ các nhóm chức năng:
+
+1. Đăng bài Facebook.
+2. Tổng quan, lịch đăng, tiến trình và lịch sử.
+3. Quản lý tài khoản Facebook, Fanpage và Extension.
+4. Gói dịch vụ và thanh toán.
+5. Xác thực tài khoản ứng dụng.
+6. Quản trị hệ thống.
+7. Chrome Extension Popup.
+
+Không tạo thêm module Marketing.
+
+## 04. DATABASE CONTRACT
+
+Database chính thức dự kiến sử dụng PostgreSQL với 19 bảng logic:
+
+- users
+- auth_sessions
+- auth_challenges
+- facebook_accounts
+- facebook_pages
+- groups
+- group_collections
+- group_collection_items
+- posts
+- media_files
+- post_media
+- publishing_tasks
+- publishing_task_items
+- task_item_media
+- extension_devices
+- plans
+- subscriptions
+- payment_orders
+- audit_logs
+
+Không tự tạo thêm trường nghiệp vụ ngoài phạm vi.
+
+Phân biệt:
+
+- Database Entity.
+- API DTO.
+- UI View Model.
+- Form State.
+- Local UI State.
+
+Frontend không cần chứa các trường nhạy cảm như password_hash, credential_encrypted, refresh_token_hash hoặc device_token_hash.
+
+Có thể sử dụng camelCase trong TypeScript nhưng phải tài liệu hóa ánh xạ với snake_case trong Database/API.
+
+## 05. PRIORITY P0 — CHUẨN HÓA TYPES
+
+Chỉnh sửa src/types/app.ts.
+
+Loại bỏ hoàn toàn các field ngoài phạm vi:
+
+- cookieDaysLeft.
+- humanEmulation.
+- minDelaySec.
+- maxDelaySec.
+- dailyLimitPerAccount.
+- groupSyncHours.
+- pingMs nếu chưa có API Contract.
+- Các field Anti-Checkpoint.
+- Các field Anti-Detection.
+- Các field mô phỏng thao tác người dùng.
+
+Loại bỏ ExtensionSettings hiện tại nếu không còn mục đích nghiệp vụ hợp lệ.
+
+### FacebookAccount
+
+Các field nghiệp vụ:
+
+- id.
+- userId.
+- facebookUid: string | null.
+- displayName.
+- avatarUrl: string | null.
+- connectionType.
+- status.
+- lastConnectedAt: string | null.
+- createdAt.
+- updatedAt.
+
+ConnectionType:
+
+- META_OAUTH.
+- MANUAL_PROFILE.
+
+Status:
+
+- CONNECTED.
+- DISCONNECTED.
+- EXPIRED.
+- ERROR.
+- UNVERIFIED.
+
+Hồ sơ thủ công phải có status UNVERIFIED.
+
+Không tự tạo UID ngẫu nhiên.
+
+### FacebookPage
+
+- id.
+- userId.
+- facebookAccountId.
+- pageUid.
+- pageName.
+- avatarUrl.
+- pageUrl.
+- canPublish.
+- createdAt.
+- updatedAt.
+
+### FacebookGroup
+
+- id.
+- userId.
+- groupUid: string | null.
+- groupName.
+- groupUrl.
+- avatarUrl: string | null.
+- memberCount: number | null.
+- requiresApproval: boolean | null.
+- notes: string | null.
+- createdAt.
+- updatedAt.
+
+Không lưu selected như dữ liệu nghiệp vụ.
+
+Selected group IDs thuộc UI State.
+
+Không dùng một collectionId duy nhất cho mỗi nhóm.
+
+### GroupCollection
+
+- id.
+- userId.
+- name.
+- createdAt.
+- updatedAt.
+
+Tạo kiểu dữ liệu GroupCollectionItem:
+
+- collectionId.
+- groupId.
+- createdAt.
+
+Một nhóm được phép thuộc nhiều bộ sưu tập.
+
+### PostDraft và SavedPost
+
+- id.
+- userId.
+- slotNumber: number | null.
+- savedName: string | null.
+- content.
+- linkUrl: string | null.
+- status: DRAFT hoặc SAVED.
+- createdAt.
+- updatedAt.
+
+Bản nháp có slotNumber từ 1 đến 10.
+
+Bài đã lưu có slotNumber = null.
+
+Danh sách media phải giữ đầy đủ tham chiếu từng tệp.
+
+Không chỉ lưu mediaCount.
+
+### MediaAttachment
+
+- id.
+- originalName.
+- mimeType.
+- sizeBytes.
+- mediaType: IMAGE hoặc VIDEO.
+- status: PENDING, READY hoặc FAILED.
+- previewUrl.
+- sortOrder.
+
+sizeLabel và thumbnail là dữ liệu trình bày được tính toán.
+
+### PublishingTask
+
+- id.
+- userId.
+- facebookAccountId: string | null.
+- targetType: GROUP hoặc PAGE.
+- executionMode: MANUAL_GROUP hoặc META_PAGE_API.
+- scheduledAt: string | null.
+- status.
+- idempotencyKey.
+- startedAt: string | null.
+- finishedAt: string | null.
+- createdAt.
+- updatedAt.
+
+TaskStatus:
+
+- SCHEDULED.
+- QUEUED.
+- RUNNING.
+- WAITING_CONFIRMATION.
+- PAUSED.
+- COMPLETED.
+- PARTIAL_FAILED.
+- FAILED.
+- NEEDS_REVIEW.
+- CANCELLED.
+
+### PublishingTaskItem
+
+- id.
+- taskId.
+- sourcePostId: string | null.
+- groupId: string | null.
+- pageId: string | null.
+- contentSnapshot.
+- linkSnapshot: string | null.
+- destinationNameSnapshot.
+- destinationUrlSnapshot: string | null.
+- mediaSnapshots.
+- status.
+- confirmationType: USER, API hoặc null.
+- resultPostUrl: string | null.
+- externalPostId: string | null.
+- errorCode: string | null.
+- errorMessage: string | null.
+- attemptCount.
+- startedAt.
+- finishedAt.
+- createdAt.
+- updatedAt.
+
+ItemStatus:
+
+- PENDING.
+- PROCESSING.
+- WAITING_CONFIRMATION.
+- SUCCESS.
+- FAILED.
+- NEEDS_REVIEW.
+- CANCELLED.
+
+Chỉ có một trong groupId hoặc pageId.
+
+completedCount, totalCount, failedCount và progressPercent phải tính từ items, không lưu các giá trị độc lập dễ mất đồng bộ.
+
+### ExtensionDevice
+
+- id.
+- userId.
+- deviceName.
+- extensionVersion.
+- lastSeenAt.
+- revokedAt.
+- createdAt.
+
+ConnectionStatus là computed field.
+
+### Plan
+
+- id.
+- code.
+- name.
+- monthlyPriceVnd.
+- yearlyPriceVnd.
+- maxFacebookAccounts.
+- maxSavedGroups.
+- maxScheduledTasks.
+- isActive.
+- createdAt.
+- updatedAt.
+
+### Subscription
+
+- id.
+- userId.
+- planId.
+- billingPeriod: MONTHLY hoặc YEARLY.
+- startsAt.
+- expiresAt.
+- status: ACTIVE, EXPIRED hoặc CANCELLED.
+
+### PaymentOrder
+
+- id.
+- userId.
+- planId.
+- orderCode.
+- amountVnd.
+- billingPeriod.
+- paymentMethod.
+- providerReference.
+- status.
+- paidAt.
+- expiresAt.
+- createdAt.
+- updatedAt.
+
+PaymentStatus:
+
+- PENDING.
+- PAID.
+- FAILED.
+- EXPIRED.
+- CANCELLED.
+
+### User
+
+- id.
+- displayName.
+- email.
+- avatarUrl.
+- role: CUSTOMER hoặc ADMIN.
+- status: ACTIVE hoặc LOCKED.
+- emailVerifiedAt.
+- lastLoginAt.
+- createdAt.
+- updatedAt.
+
+Không trộn trạng thái hết hạn subscription với trạng thái tài khoản user.
+
+## 06. PRIORITY P0 — SỬA AUTHENTICATION VÀ ROUTING
+
+Hiện tại App.tsx mặc định mở Dashboard bằng activeRoute useState, tự có tài khoản mẫu và extensionConnected = true.
+
+AuthPage.tsx sử dụng setTimeout để tự đăng nhập thành công.
+
+Hãy sửa:
+
+- Sử dụng React Router tương thích với project.
+- Route thực trên URL.
+- Mặc định chưa đăng nhập thì chuyển đến /login.
+- Đăng nhập thành công chuyển đến /post.
+- Logout kết thúc phiên demo và trở về /login.
+- Khi refresh trình duyệt, không tự cấp quyền đăng nhập.
+- Bảo vệ route khách hàng bằng AuthGuard.
+- Bảo vệ /admin bằng AdminGuard.
+- Customer không thấy menu Admin.
+- Customer truy cập trực tiếp /admin phải bị từ chối.
+- Phân quyền frontend chỉ phục vụ prototype, không thay thế xác thực Backend.
+
+Các route:
+
+- /login
+- /register
+- /forgot-password
+- /reset-password
+- /post
+- /dashboard
+- /accounts
+- /pricing
+- /admin
+- /extension-preview
+
+/extension-preview chỉ dành cho mô phỏng development, không phải trang khách hàng production.
+
+Tạo đủ 4 biểu mẫu xác thực.
+
+Không điền sẵn mật khẩu giả vào form.
+
+Không cho mọi email và mật khẩu tự đăng nhập thành công.
+
+Nếu chưa có Backend, tạo chế độ DEMO được ghi nhãn rõ ràng với tài khoản thử nghiệm hoặc nút trải nghiệm demo.
+
+Không thu thập mật khẩu thật của khách hàng trong prototype.
+
+Đăng ký và quên mật khẩu phải hiển thị rõ là mô phỏng nếu chưa gửi email thật.
+
+## 07. PRIORITY P0 — SỬA TRANG ĐĂNG BÀI
+
+File:
+
+src/pages/PostComposerPage.tsx
+
+Giữ bố cục workstation hai cột.
+
+Cột trái: soạn bài.
+
+Cột phải: nhóm/Fanpage.
+
+### 07.1. Quản lý 10 bản nháp
+
+Giữ chính xác 10 tab.
+
+Mỗi tab có:
+
+- Content.
+- Link.
+- Media riêng.
+- Trạng thái lưu.
+
+Cho phép chọn một hoặc nhiều bản nháp để tạo tác vụ.
+
+Tab đang mở và tab được chọn để đăng là hai UI State khác nhau.
+
+Không mặc định tất cả 10 bản nháp đều được đăng.
+
+### 07.2. Kiểm tra nội dung
+
+Hiện tại handleOpenConfirmModal bắt buộc activeSlot.content không được trống.
+
+Sửa validation:
+
+Một bản nháp hợp lệ khi có ít nhất một trong các thành phần:
+
+- Nội dung văn bản không trống.
+- Link hợp lệ.
+- Media hợp lệ.
+
+Kiểm tra khả năng hỗ trợ loại nội dung của phương thức đăng.
+
+Bài hoàn toàn trống không được tạo tác vụ.
+
+### 07.3. Media
+
+Kiểm tra file type và file size.
+
+Hỗ trợ:
+
+- Chọn ảnh/video.
+- Kéo thả.
+- Xem trước.
+- Xóa tệp.
+- Sắp xếp thứ tự.
+
+Giải phóng object URL khi không còn sử dụng.
+
+Không trình bày URL.createObjectURL như tệp đã upload lên máy chủ.
+
+Nếu chỉ dùng tệp local, ghi rõ trạng thái.
+
+Khi lưu bài mẫu, phải lưu đầy đủ danh sách attachment reference.
+
+Không chỉ lưu mediaCount.
+
+Khi nạp lại bài đã lưu, phải khôi phục cả content, link và media nếu tệp vẫn khả dụng.
+
+### 07.4. Thêm và quản lý nhóm
+
+Hiện tại handleSubmitAddGroup tự sinh UID và tự gán memberCount = 12000.
+
+Loại bỏ logic này.
+
+Nếu UID không có:
+
+- groupUid = null.
+
+Nếu số thành viên không có:
+
+- memberCount = null.
+
+Nếu chưa rõ duyệt bài:
+
+- requiresApproval = null.
+
+Không tự tạo số liệu Facebook.
+
+Kiểm tra URL thuộc đúng cấu trúc Facebook Group.
+
+Kiểm tra trùng URL và UID nếu có.
+
+Modal thêm nhóm mặc định để trống các trường.
+
+Không điền sẵn tên nhóm, UID và số thành viên như dữ liệu thật.
+
+Cho phép:
+
+- Thêm nhóm.
+- Sửa nhóm.
+- Xóa nhóm đã lưu.
+- Tìm kiếm.
+- Nhập CSV.
+- Xuất CSV.
+- Lưu bộ sưu tập.
+- Đổi tên bộ sưu tập.
+- Xóa bộ sưu tập.
+
+Xóa nhóm khỏi tool không được hiểu là rời khỏi nhóm Facebook.
+
+### 07.5. Bộ sưu tập
+
+Sửa GroupCollection thành quan hệ nhiều-nhiều thông qua GroupCollectionItem.
+
+Khi nhấn Lưu bộ sưu tập:
+
+- Nhập tên.
+- Lấy danh sách group IDs đã chọn.
+- Tạo collection.
+- Tạo các collection items.
+
+Không chỉ tạo một collection rỗng.
+
+Xóa bộ sưu tập không xóa nhóm gốc.
+
+### 07.6. CSV
+
+CSV import phải có:
+
+- Chọn file thật.
+- Parse dữ liệu.
+- Kiểm tra header.
+- Kiểm tra URL.
+- Kiểm tra dữ liệu trùng.
+- Preview từng dòng.
+- Hiển thị số hợp lệ, trùng và lỗi.
+- Xác nhận trước khi nhập.
+
+Các trường CSV được phép:
+
+- group_name
+- group_url
+- group_uid
+- member_count
+- requires_approval
+- notes
+
+CSV export phải xử lý chính xác dấu phẩy, dấu ngoặc kép và xuống dòng.
+
+Bảo vệ dữ liệu export khỏi CSV formula injection.
+
+Nếu nút ghi Xuất nhóm đã chọn thì phải xuất đúng nhóm được chọn, không xuất toàn bộ nhóm đang hiển thị.
+
+### 07.7. Loại bỏ thống kê sai
+
+Xóa totalReach vì cộng tổng thành viên nhóm không phải lượt tiếp cận thực tế.
+
+Xóa instantOpenPct và các tỷ lệ tự đặt.
+
+Không hiển thị:
+
+- Dự kiến tiếp cận.
+- Tỷ lệ đăng trực tiếp giả.
+- Tỷ lệ duyệt bài giả.
+- Tỷ lệ chống checkpoint.
+- Thống kê thành viên không có nguồn.
+
+### 07.8. Fanpage
+
+Khi chọn một Facebook account, chỉ hiển thị Fanpage thuộc tài khoản đó.
+
+Không cho chọn Fanpage có canPublish = false.
+
+Không cho tạo tác vụ Fanpage khi tài khoản chưa được cấp quyền.
+
+Khi đổi tài khoản, kiểm tra và loại bỏ lựa chọn Fanpage không còn hợp lệ.
+
+### 07.9. Lên lịch
+
+Loại bỏ toàn bộ giá trị mặc định 2024-10-24T17:30.
+
+Sử dụng ngày giờ hiện tại hoặc thời điểm tương lai do người dùng chọn.
+
+Hiển thị giờ Việt Nam.
+
+Lưu timestamp chuẩn ISO 8601 UTC.
+
+Không cho chọn lịch đã qua.
+
+### 07.10. Modal xác nhận
+
+Cho phép xác định từng cặp:
+
+- postId.
+- groupId hoặc pageId.
+
+Mỗi dòng đại diện một task item.
+
+Không tự động tạo tất cả tổ hợp bài viết và đích đăng.
+
+Cho phép:
+
+- Chọn bản nháp.
+- Chọn đích đăng cho bản nháp.
+- Xem trước từng cặp.
+- Xóa dòng khỏi danh sách.
+- Kiểm tra dữ liệu.
+- Xác nhận tạo tác vụ.
+
+Hiển thị:
+
+- Tổng bài viết đã chọn.
+- Tổng đích đăng.
+- Tổng lượt đăng được xác nhận.
+- Nội dung.
+- Media.
+- Lịch thực hiện.
+- Phương thức đăng.
+
+### 07.11. Tạo tác vụ
+
+Sửa handleConfirmCreateTask.
+
+Không dùng Math.random để sinh mã tác vụ có thể trùng.
+
+Sử dụng ID ổn định như crypto.randomUUID trong mock service.
+
+Tạo task và task items từ dữ liệu đã xác nhận.
+
+Lưu immutable snapshot của:
+
+- Content.
+- Link.
+- Media.
+- Destination name.
+- Destination URL.
+
+Không lưu tham chiếu tới bản nháp đang chỉnh sửa thay cho snapshot.
+
+Sửa bản nháp sau khi tạo tác vụ không được thay đổi lịch sử.
+
+Chống tạo tác vụ trùng khi nhấn liên tục.
+
+Khi chưa kết nối Backend thật, thông báo:
+
+“Đã tạo tác vụ mô phỏng”.
+
+Không thông báo đã phát hành thật.
+
+## 08. PRIORITY P0 — SỬA TASK STATE MACHINE
+
+Tập trung vào các hàm trong App.tsx:
+
+- handlePauseResumeTask.
+- handleConfirmWaitingTask.
+- handleCancelTask.
+- handleRetryFailedTask.
+- handleUpdateTaskSchedule.
+
+### Pause
+
+Lỗi hiện tại:
+
+RUNNING được chuyển thành SCHEDULED.
+
+Sửa:
+
+RUNNING hoặc QUEUED có thể chuyển PAUSED nếu điều kiện cho phép.
+
+Không thay đổi lịch đăng khi tạm dừng.
+
+Không thay đổi các item đã thành công.
+
+### Resume
+
+Chỉ tiếp tục tác vụ PAUSED.
+
+Khôi phục những item chưa hoàn thành theo quy tắc điều phối.
+
+Không tự tạo lại item SUCCESS.
+
+### Cancel
+
+Hủy các item chưa bắt đầu hoặc đang chờ xác nhận khi có thể hủy an toàn.
+
+Giữ nguyên kết quả SUCCESS và FAILED đã ghi nhận.
+
+Item đang PROCESSING mà chưa biết kết quả phải chuyển NEEDS_REVIEW nếu không thể xác định an toàn.
+
+Không xóa bài đã đăng trên Facebook.
+
+Không xóa lịch sử.
+
+### Confirm
+
+Hiện tại handleConfirmWaitingTask đánh dấu cả task COMPLETED và completedCount = totalCount.
+
+Đây là lỗi.
+
+Sửa thành xác nhận từng item theo itemId.
+
+Chỉ item được xác nhận mới thay đổi trạng thái.
+
+Hỗ trợ kết quả:
+
+- SUCCESS.
+- FAILED.
+- NEEDS_REVIEW.
+
+Lưu confirmationType = USER đối với nhóm.
+
+Không tự đánh dấu mọi item thành công.
+
+### Retry
+
+Chỉ retry item FAILED đủ điều kiện.
+
+Không retry SUCCESS.
+
+Không tự retry NEEDS_REVIEW.
+
+Không retry khi chưa biết lần trước đã đăng hay chưa.
+
+Tăng attemptCount khi thực hiện retry hợp lệ.
+
+### Aggregate status
+
+Tạo hàm dùng chung deriveTaskStatus.
+
+Tạo hàm getTaskProgress.
+
+Tổng hợp trạng thái task cha từ items và trạng thái điều phối.
+
+Nếu toàn bộ item SUCCESS thì COMPLETED.
+
+Nếu có item cần kiểm tra kết quả thì hiển thị NEEDS_REVIEW khi phù hợp.
+
+Nếu tất cả item kết thúc nhưng có cả thành công và thất bại thì PARTIAL_FAILED.
+
+Nếu tất cả item thất bại thì FAILED.
+
+Nếu tất cả item bị hủy thì CANCELLED.
+
+Định nghĩa rõ các trường hợp kết hợp SUCCESS, FAILED và CANCELLED.
+
+Không tính các item chưa xác định kết quả là thành công.
+
+Sử dụng cùng các hàm tổng hợp tại:
+
+- PostComposerPage.
+- DashboardPage.
+- TaskDrawer.
+- ExtensionPopupPage.
+
+Không duy trì logic tiến trình khác nhau trên mỗi màn hình.
+
+## 09. PRIORITY P1 — SỬA DASHBOARD
+
+File:
+
+src/pages/DashboardPage.tsx
+
+Giữ layout hiện tại nếu hợp lý.
+
+Sửa:
+
+- Bộ lọc dateFilter phải thực sự lọc dữ liệu.
+- Account filter phải hoạt động.
+- Status filter phải hoạt động.
+- Search phải hoạt động.
+- Pagination phải chính xác.
+- Reset page về 1 khi đổi bộ lọc.
+- Không hiển thị trang rỗng do số trang vượt giới hạn.
+- Hỗ trợ đủ 10 TaskStatus.
+- Hiển thị đúng màu và nhãn trạng thái.
+
+Calendar:
+
+- Sử dụng tháng và năm hiện tại.
+- Cho phép chuyển tháng thực tế.
+- Tính số ngày theo tháng.
+- Hiển thị đúng thứ trong tuần.
+- Các ngày có tác vụ lấy từ scheduledAt.
+- Không hardcode taskDays.
+- Không sử dụng calendarDay riêng.
+
+KPI:
+
+- Hoàn thành hôm nay.
+- Đang chạy.
+- Chờ tới giờ.
+- Thất bại.
+
+Tất cả tính từ task data thật của prototype.
+
+Không hardcode số liệu.
+
+TaskDrawer:
+
+- Hiển thị snapshot.
+- Hiển thị từng item.
+- Hiển thị lỗi.
+- Hiển thị thời gian.
+- Hiển thị link kết quả nếu có.
+- Cho phép xác nhận từng item.
+- Cho phép retry từng item đủ điều kiện.
+
+Khi drawer đang mở và task thay đổi, dữ liệu phải cập nhật.
+
+## 10. PRIORITY P0 — SỬA ACCOUNT MANAGEMENT
+
+Các file:
+
+- AccountsPage.tsx.
+- ConnectAccountModal.tsx.
+- App.tsx.
+
+Sửa handleConnectOAuth:
+
+Không tự sinh UID Facebook bằng Math.random.
+
+Không thông báo Meta OAuth thật thành công khi chưa thực hiện OAuth.
+
+Tạo Demo OAuth state được đánh dấu rõ hoặc disable chức năng thật.
+
+Sửa handleAddManualAccount:
+
+- displayName bắt buộc.
+- facebookUid có thể null.
+- status = UNVERIFIED.
+- connectionType = MANUAL_PROFILE.
+
+Sửa handleRefreshAccountStatus:
+
+Không tự đổi mọi account thành CONNECTED.
+
+Không tự đặt verifiedOAuth = true.
+
+Chỉ cập nhật trạng thái theo kết quả service hoặc fixture demo rõ ràng.
+
+Sửa handleDisconnectAccount:
+
+Không xóa bản ghi tài khoản khỏi state nếu tài khoản được lịch sử tham chiếu.
+
+Chuyển sang DISCONNECTED.
+
+Sửa Fanpage sync:
+
+Không báo đã đồng bộ Graph API thật nếu chưa có tích hợp.
+
+Sửa Extension device:
+
+- Không tạo ping ngẫu nhiên.
+- Không hiển thị IP nếu không có contract.
+- Phân biệt CONNECTED, OFFLINE và REVOKED.
+- Thu hồi thiết bị phải cập nhật revokedAt.
+- Không thể làm thiết bị đã thu hồi online chỉ bằng nhấn kiểm tra kết nối.
+
+## 11. PRIORITY P0 — SỬA PAYMENT FLOW
+
+Các file:
+
+- PricingPage.tsx.
+- App.tsx.
+- mockData.ts.
+
+Lỗi nghiêm trọng hiện tại:
+
+handleVerifyClick gọi setTimeout rồi handleVerifyOrderPayment tự đặt PAID và nâng cấp gói.
+
+Phải loại bỏ hoàn toàn hành vi này khỏi luồng khách hàng.
+
+### Luồng chuẩn
+
+1. Chọn gói.
+2. Chọn chu kỳ.
+3. Tạo payment order.
+4. Hiển thị thông tin thanh toán.
+5. Đơn ở trạng thái PENDING.
+6. Khách hàng kiểm tra trạng thái.
+7. Service trả trạng thái hiện tại.
+8. Chỉ khi nhận PAID đã được xác minh thì cập nhật subscription.
+
+Trong prototype:
+
+- QR phải là placeholder rõ ràng.
+- Không sử dụng tài khoản ngân hàng thật.
+- Không yêu cầu khách hàng chuyển tiền.
+- Kiểm tra thanh toán không được tự chuyển PAID.
+- Có thể tạo fixture PAID dành riêng cho việc kiểm thử development.
+- Không cung cấp nút chuyển PAID cho khách hàng thông thường.
+
+Payment order phải có:
+
+- orderCode.
+- amountVnd.
+- planId.
+- billingPeriod.
+- createdAt.
+- expiresAt.
+- paidAt.
+- status.
+
+Countdown tính từ expiresAt và thời gian hiện tại.
+
+Không hardcode 15 phút bắt đầu lại mỗi lần refresh.
+
+Không sử dụng ngày 24/10/2024.
+
+Xử lý trường hợp chưa có đơn hàng.
+
+Không truy cập activeOrder.plan nếu activeOrder undefined.
+
+### Usage limits
+
+Loại bỏ:
+
+Math.max(248, groupsCount).
+
+Math.max(5, scheduledCount).
+
+Hạn mức sử dụng tính từ:
+
+- Số tài khoản Facebook hợp lệ theo quy tắc gói.
+- Số nhóm đã lưu.
+- Số tác vụ đang SCHEDULED.
+
+Không tự nâng số sử dụng lên mức tối thiểu.
+
+Khi chưa có gói hoạt động:
+
+- Cho phép xem bảng giá.
+- Cho phép mua hoặc gia hạn.
+- Không cho tạo tác vụ trả phí.
+
+## 12. PRIORITY P1 — SỬA ADMIN
+
+File:
+
+src/pages/AdminPage.tsx.
+
+Hiện tại AdminTab là users, plans, tasks, settings.
+
+Sửa thành:
+
+- overview.
+- users.
+- plans.
+- payments.
+
+### Tổng quan
+
+Chỉ hiển thị:
+
+- Tổng khách hàng.
+- Khách đang có gói hiệu lực.
+- Khách đã hết hạn.
+- Doanh thu tháng từ payment PAID.
+
+Các số liệu phải tính toán từ state.
+
+### Khách hàng
+
+Các hành động:
+
+- Xem chi tiết.
+- Khóa tài khoản.
+- Mở khóa tài khoản.
+- Gia hạn.
+- Đổi gói.
+
+Không mặc định cho xóa vĩnh viễn khách hàng khỏi hệ thống.
+
+Không cho tự khóa tài khoản Admin đang sử dụng.
+
+Không tự phát sinh vai trò SuperAdmin hoặc Member khi contract chỉ có CUSTOMER và ADMIN.
+
+Phân biệt:
+
+- User status.
+- Subscription status.
+
+### Gói dịch vụ
+
+Hiện tại PLAN_SPECS là dữ liệu cố định.
+
+Chuyển sang shared plan store hoặc mock service.
+
+Admin có thể:
+
+- Tạo gói.
+- Sửa tên.
+- Sửa giá tháng.
+- Sửa giá năm.
+- Sửa hạn mức tài khoản.
+- Sửa hạn mức nhóm.
+- Sửa hạn mức tác vụ chờ lịch.
+- Bật hoặc tắt gói.
+
+Thay đổi gói phải đồng bộ sang trang Pricing của khách hàng.
+
+Không tự sửa giá của đơn thanh toán đã tạo.
+
+### Thanh toán
+
+Hiển thị danh sách payment orders thật của prototype.
+
+Cho phép:
+
+- Tìm kiếm.
+- Lọc.
+- Xem chi tiết.
+- Mô phỏng xác nhận quản trị trong DEMO mode riêng.
+
+Mọi thao tác quản trị nhạy cảm phải có modal xác nhận.
+
+### Loại bỏ
+
+- Global Anti-Checkpoint settings.
+- Human Emulation settings.
+- Daily posting limit.
+- Random delay.
+- Auto sync nhóm.
+- Quảng cáo giảm 98.4% checkpoint.
+- Giám sát hành vi đăng bài ngoài phạm vi.
+- Các module quản trị không nằm trong contract.
+
+## 13. PRIORITY P0 — SỬA CHROME EXTENSION POPUP
+
+File:
+
+src/pages/ExtensionPopupPage.tsx.
+
+Giữ phần mô phỏng khung popup trình duyệt nếu đẹp.
+
+Kích thước khoảng 385 × 560px.
+
+Loại bỏ:
+
+- COOKIE LIVE.
+- Cookie Expired.
+- Cookie extraction.
+- Facebook token extraction.
+- Human Typing.
+- Fast Paste automation.
+- Human Emulation.
+- Anti-Checkpoint.
+- Jitter Delay.
+- Safe delay countdown.
+- Sync Nhóm tự động.
+- Terminal logs giả.
+- Ping socket ngẫu nhiên.
+- Tỷ lệ thành công giả.
+- Daily posting limit.
+- Cấu hình né cơ chế bảo vệ nền tảng.
+
+Chrome Extension Popup chính thức chỉ có:
+
+### Header
+
+- Logo.
+- Tên FB POST PRO.
+- Version nếu có nguồn.
+- Trạng thái kết nối.
+
+### Tài khoản dịch vụ
+
+- Tên khách hàng.
+- Email.
+- Gói dịch vụ.
+- Ngày hết hạn.
+- Hạn mức tài khoản.
+
+### Tác vụ hiện tại
+
+- Task ID.
+- Task item ID.
+- Tên đích đăng.
+- Nội dung snapshot.
+- Media snapshot.
+- Trạng thái.
+- Tiến trình.
+
+### Nút bấm
+
+- Kết nối website.
+- Kiểm tra kết nối.
+- Sao chép nội dung.
+- Mở nhóm Facebook.
+- Xác nhận kết quả.
+- Tạm dừng tác vụ.
+- Tiếp tục tác vụ.
+- Hủy tác vụ.
+- Mở website.
+- Ngắt kết nối.
+
+Mở nhóm là hành động mở URL hợp lệ do người dùng lựa chọn.
+
+Người dùng thực hiện đăng nhóm và xác nhận kết quả.
+
+Không tự đánh dấu thành công khi mở nhóm.
+
+### Xác nhận kết quả
+
+Modal:
+
+- Đã đăng bài.
+- Đăng thất bại.
+- Chưa xác định kết quả.
+- Link bài đăng tùy chọn.
+- Mô tả lỗi khi cần.
+
+Gọi handler theo taskItemId.
+
+Không xác nhận toàn bộ task.
+
+### UI States
+
+- Chưa kết nối.
+- Đang kết nối.
+- Đã kết nối.
+- Offline.
+- Đã thu hồi thiết bị.
+- Gói hết hạn.
+- Không có tác vụ.
+- Chờ xác nhận.
+- Lỗi kết nối.
+
+Trang hiện tại chỉ là Extension Preview.
+
+Không tuyên bố đây là extension thật có thể cài vào Chrome khi chưa có manifest và runtime.
+
+## 14. PRIORITY P1 — SHARED BUSINESS LOGIC
+
+App.tsx đang chứa quá nhiều state và handler.
+
+Refactor hợp lý, tránh một file quá lớn.
+
+Cấu trúc đề xuất:
+
+    src/
+      components/
+      pages/
+      types/
+        domain.ts
+        api.ts
+        viewModels.ts
+      services/
+        contracts.ts
+        mockService.ts
+      state/
+        authStore.ts
+        postStore.ts
+        taskStore.ts
+        accountStore.ts
+        billingStore.ts
+      utils/
+        dateTime.ts
+        validation.ts
+        taskStatus.ts
+        csv.ts
+        formatters.ts
+      data/
+        mockData.ts
+      App.tsx
+
+Có thể sử dụng React Context hoặc state manager nhỏ phù hợp với mã nguồn.
+
+Không bắt buộc thêm dependency nếu không cần.
+
+Tạo service abstraction để Codex có thể thay MockService bằng API service trong tương lai.
+
+Các page không trực tiếp tự tạo business data khi nhận kết quả từ service.
+
+Không để cùng một subscription, task hoặc plan có nhiều nguồn dữ liệu mâu thuẫn.
+
+## 15. PRIORITY P1 — DATA PERSISTENCE CHO PROTOTYPE
+
+Hiện tại dữ liệu chủ yếu nằm trong useState.
+
+Khi reload có thể mất thay đổi.
+
+Có thể sử dụng localStorage cho dữ liệu demo không nhạy cảm.
+
+Đối với media demo, sử dụng cơ chế phù hợp với file local hoặc IndexedDB nếu cần.
+
+Không lưu mật khẩu, access token thật hoặc Facebook cookie trong localStorage.
+
+Có chức năng reset dữ liệu demo dành riêng cho development.
+
+Không biến localStorage thành Database production.
+
+## 16. PRIORITY P2 — CẢI THIỆN UI/UX
+
+Giữ giao diện hiện có, không redesign toàn bộ.
+
+Chuẩn hóa Design System:
+
+- Font Be Vietnam Pro hoặc font hiện có hỗ trợ tiếng Việt tốt.
+- Primary #2563EB.
+- White surface.
+- Background #F8FAFC.
+- Border #E2E8F0.
+- Text #0F172A.
+- Secondary #64748B.
+- Success #16A34A.
+- Warning #D97706.
+- Error #DC2626.
+
+Giảm bớt:
+
+- Banner không cần thiết.
+- Badge kỹ thuật giả.
+- Thuật ngữ marketing phức tạp.
+- Số liệu kỹ thuật không phục vụ người dùng.
+- Text quá dài.
+- Nút bấm không có hành động.
+
+Ưu tiên:
+
+- Trang đăng bài sử dụng được tại 1440 × 900.
+- Hiển thị tốt tại 1920 × 1080.
+- Sidebar thu gọn.
+- Danh sách nhóm cuộn độc lập.
+- Action bar dễ nhìn thấy.
+- Tooltip rõ ràng.
+- Modal không vượt viewport.
+- Dialog có thể đóng bằng Escape.
+- Form có label.
+- Điều hướng bằng bàn phím.
+- Không cuộn ngang toàn bộ website ngoài ý muốn.
+- Không có component bị che hoặc tràn màn hình.
+
+Mọi nút bấm phải thực hiện đúng hành động hoặc được disable kèm giải thích.
+
+Không dùng toast thành công cho thao tác chưa thực hiện.
+
+## 17. BỘ TRẠNG THÁI GIAO DIỆN
+
+Tất cả màn hình cần có:
+
+- Loading.
+- Empty.
+- Error.
+- Disabled.
+- Success.
+- Confirmation.
+
+Các trường hợp phải xử lý:
+
+- Không có tài khoản Facebook.
+- Không có nhóm.
+- Không có Fanpage.
+- Không có bài đã lưu.
+- Không có tác vụ.
+- Không có subscription.
+- Không có payment order.
+- Không có thiết bị Extension.
+- Gói hết hạn.
+- Không đủ quyền đăng Fanpage.
+- Media lỗi.
+- Không tìm thấy dữ liệu.
+- Lịch không hợp lệ.
+
+Không truy cập thuộc tính của undefined hoặc null.
+
+Không fallback sang dữ liệu giả để che lỗi.
+
+## 18. TEST SCENARIOS BẮT BUỘC
+
+Kiểm tra từng luồng sau:
+
+TEST-01: Mở app chưa đăng nhập phải tới /login.
+
+TEST-02: Đăng nhập demo thành công tới /post.
+
+TEST-03: Customer không truy cập được /admin.
+
+TEST-04: Chuyển giữa 10 tab không làm mất nội dung.
+
+TEST-05: Bản nháp chỉ có ảnh hợp lệ không bị từ chối do thiếu text.
+
+TEST-06: Thêm nhóm không nhập UID và số thành viên thì lưu null.
+
+TEST-07: Một nhóm có thể nằm trong hai bộ sưu tập.
+
+TEST-08: Xóa bộ sưu tập không xóa nhóm gốc.
+
+TEST-09: Import CSV xử lý dữ liệu trùng và lỗi.
+
+TEST-10: Export nhóm đã chọn xuất đúng nhóm.
+
+TEST-11: Fanpage không có quyền đăng không thể được chọn.
+
+TEST-12: Không tạo tác vụ với thời gian trong quá khứ.
+
+TEST-13: Chỉ tạo các cặp bài và đích đã xác nhận.
+
+TEST-14: Nhấn xác nhận hai lần không tạo hai task giống nhau.
+
+TEST-15: Sửa bản nháp không thay đổi snapshot tác vụ.
+
+TEST-16: Pause chuyển sang PAUSED, không phải SCHEDULED.
+
+TEST-17: Resume chỉ áp dụng cho tác vụ PAUSED.
+
+TEST-18: Xác nhận một item không làm tất cả item SUCCESS.
+
+TEST-19: Cancel giữ nguyên kết quả item đã hoàn thành.
+
+TEST-20: Retry không xử lý lại item SUCCESS hoặc NEEDS_REVIEW.
+
+TEST-21: Date filter thực sự lọc tác vụ.
+
+TEST-22: Calendar thay đổi đúng tháng và dữ liệu.
+
+TEST-23: Không có đơn thanh toán thì Pricing không crash.
+
+TEST-24: Nhấn kiểm tra thanh toán không tự chuyển PAID.
+
+TEST-25: Hạn mức bằng 0 phải hiển thị 0, không tự tạo số liệu.
+
+TEST-26: Admin sửa gói thì trang Pricing cập nhật đúng.
+
+TEST-27: Thu hồi thiết bị không thể tự chuyển về CONNECTED.
+
+TEST-28: Hồ sơ thủ công luôn UNVERIFIED cho đến khi có xác thực hợp lệ.
+
+TEST-29: Extension không xác nhận thành công khi chỉ mở nhóm.
+
+TEST-30: Logout và chuyển tài khoản không làm lộ dữ liệu demo của người dùng khác.
+
+## 19. TÀI LIỆU CHUYỂN GIAO
+
+Tạo thư mục docs/.
+
+Tạo các file:
+
+- DESIGN.md
+- SCREEN_MAPPING.md
+- ACTIONS.md
+- DATA_CONTRACT.md
+- API_MAPPING.md
+- TASK_STATE_MACHINE.md
+- FRONTEND_AUDIT.md
+- TEST_REPORT.md
+
+SCREEN_MAPPING.md:
+
+- Screen.
+- Route.
+- Component.
+- UI label.
+- Data field.
+- Field type.
+- Action ID.
+
+ACTIONS.md:
+
+- Action ID.
+- Button label.
+- Preconditions.
+- Input.
+- Validation.
+- Service handler.
+- API endpoint dự kiến.
+- Success state.
+- Error state.
+- Disabled condition.
+
+DATA_CONTRACT.md:
+
+- Database table reference.
+- API DTO.
+- UI View Model.
+- Nullable fields.
+- Computed fields.
+- Form-only fields.
+- UI state.
+
+FRONTEND_AUDIT.md:
+
+- Lỗi phát hiện.
+- File có lỗi.
+- Cách sửa.
+- Trạng thái.
+- Hạn chế còn tồn tại.
+
+Đánh dấu rõ endpoint nào mới là dự kiến, chưa kết nối Backend.
+
+## 20. KIỂM THỬ KỸ THUẬT
+
+Kiểm tra package.json.
+
+Loại bỏ dependency không sử dụng, bao gồm Gemini SDK nếu dự án không sử dụng AI.
+
+Không thêm tính năng AI ngoài phạm vi.
+
+Kiểm tra tính tương thích của dependencies.
+
+Tạo lockfile bằng package manager đã chọn.
+
+Chạy:
+
+- npm install hoặc lệnh phù hợp package manager.
+- npm run lint.
+- npm run build.
+
+Nếu có thể, bổ sung unit tests cho:
+
+- Task state machine.
+- Data validation.
+- Payment state.
+- Subscription limits.
+- Group collections.
+- CSV parsing.
+
+Không tắt TypeScript validation để che lỗi.
+
+Không báo đã chạy test nếu môi trường không cho chạy.
+
+## 21. THỨ TỰ TRIỂN KHAI
+
+Thực hiện lần lượt:
+
+Giai đoạn A:
+
+- Sửa types.
+- Sửa mock data.
+- Sửa service layer.
+- Sửa routing và authentication.
+
+Giai đoạn B:
+
+- Sửa Post Composer.
+- Sửa group collections.
+- Sửa media.
+- Sửa xác nhận và tạo tác vụ.
+
+Giai đoạn C:
+
+- Sửa task state machine.
+- Sửa Dashboard.
+- Sửa TaskDrawer.
+
+Giai đoạn D:
+
+- Sửa Accounts.
+- Sửa Pricing.
+- Sửa Admin.
+- Sửa Extension Popup.
+
+Giai đoạn E:
+
+- Kiểm tra UX.
+- Kiểm tra các nút bấm.
+- Kiểm tra responsive.
+- Chạy build.
+- Chạy kiểm thử.
+- Cập nhật tài liệu.
+
+Không chỉ trả lời kế hoạch.
+
+Hãy trực tiếp chỉnh sửa mã nguồn hiện tại.
+
+## 22. TIÊU CHÍ NGHIỆM THU
+
+Chỉ được xem là hoàn thành khi:
+
+- Đủ 13 màn hình chính thuộc 7 nhóm nghiệp vụ.
+- Không thêm chức năng ngoài phạm vi.
+- Tất cả route hoạt động.
+- Tất cả nút nghiệp vụ có hành động xác định.
+- Tất cả field khớp Data Contract.
+- Task state machine thống nhất.
+- Không fake OAuth success.
+- Không fake payment success.
+- Không fake Extension connection.
+- Không fake Facebook publishing success.
+- Không hardcode ngày tháng đã cũ trong logic.
+- Không có thống kê giả không được đánh dấu.
+- Không còn logic Anti-Checkpoint hoặc Human Emulation.
+- Không lỗi TypeScript.
+- Production build thành công nếu môi trường cho phép.
+- Có tài liệu bàn giao Codex.
+
+## 23. BÁO CÁO CUỐI CÙNG
+
+Cung cấp:
+
+1. Danh sách lỗi đã phát hiện.
+2. Danh sách file đã chỉnh sửa.
+3. Danh sách chức năng đã sửa.
+4. Danh sách field đã loại bỏ.
+5. Danh sách field đã chuẩn hóa.
+6. Danh sách luồng đã kiểm thử.
+7. Kết quả lint.
+8. Kết quả build.
+9. Kết quả test.
+10. Các chức năng vẫn là prototype.
+11. Các API chưa triển khai.
+12. Các hạn chế còn tồn tại.
+
+Không tự báo phần mềm production-ready khi chưa có Backend thật.
+
+Không tạo thêm dự án mới.
+
+BẮT ĐẦU CHỈNH SỬA TRỰC TIẾP MÃ NGUỒN FB POST PRO NGAY BÂY GIỜ.
